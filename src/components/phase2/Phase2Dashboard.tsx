@@ -1,0 +1,1037 @@
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  FileDown, RotateCcw, Lock, ArrowRight, AlertTriangle, CheckCircle2, XCircle,
+  DollarSign, Clock, Users, Wrench, TrendingUp, Zap, Target, Shield,
+  Layers, Brain, Rocket, BarChart3, Eye, HelpCircle, Briefcase, ArrowUpRight,
+  Activity, Crosshair, Scale, GitBranch,
+} from "lucide-react";
+import { toast } from "sonner";
+import { ScoreTooltip, getLayerTooltip } from "@/components/ui/score-tooltip";
+
+interface Phase2DashboardProps {
+  projectId: string;
+  onRerun: () => void;
+  onLockProceed?: () => void;
+}
+
+const severityColor = (s: string) => {
+  const sl = s?.toLowerCase();
+  if (sl === "low") return "bg-green-100 text-green-800 border-green-200";
+  if (sl === "moderate" || sl === "medium" || sl === "moderate-high") return "bg-amber-100 text-amber-800 border-amber-200";
+  if (sl === "high" || sl === "critical") return "bg-red-100 text-red-800 border-red-200";
+  return "bg-muted text-muted-foreground";
+};
+
+const tierColor = (t: string) => {
+  const tl = t?.toLowerCase();
+  if (tl?.includes("ready") || tl?.includes("aligned") || tl?.includes("self-") || tl?.includes("realistic") || tl === "low" || tl === "simple" || tl === "enterprise" || tl === "high" || tl === "strong") return "bg-green-100 text-green-800";
+  if (tl?.includes("fragile") || tl?.includes("constrained") || tl?.includes("mildly") || tl?.includes("contractor") || tl?.includes("optimistic") || tl === "moderate" || tl === "limited") return "bg-amber-100 text-amber-800";
+  if (tl?.includes("premature") || tl?.includes("severely") || tl?.includes("unrealistic") || tl?.includes("high burn") || tl?.includes("high execution") || tl === "complex") return "bg-red-100 text-red-800";
+  return "bg-muted text-muted-foreground";
+};
+
+const classColor = (c: string) => {
+  if (c === "Execution Ready") return "text-green-600 bg-green-50 border-green-200";
+  if (c === "Structurally Sound but Resource Sensitive") return "text-blue-600 bg-blue-50 border-blue-200";
+  if (c === "Structured but Fragile" || c === "Fragile Execution") return "text-amber-600 bg-amber-50 border-amber-200";
+  if (c === "Resource-Constrained" || c === "High Execution Risk") return "text-orange-600 bg-orange-50 border-orange-200";
+  return "text-red-600 bg-red-50 border-red-200";
+};
+
+const classIcon = (c: string) => {
+  if (c === "Execution Ready") return <CheckCircle2 className="h-5 w-5" />;
+  if (c === "Structurally Sound but Resource Sensitive") return <TrendingUp className="h-5 w-5" />;
+  if (c === "Fragile Execution" || c === "Structured but Fragile") return <AlertTriangle className="h-5 w-5" />;
+  if (c === "High Execution Risk" || c === "Resource-Constrained") return <AlertTriangle className="h-5 w-5" />;
+  return <XCircle className="h-5 w-5" />;
+};
+
+const getBarColor = (s: number) => s >= 70 ? "hsl(var(--primary))" : s >= 50 ? "hsl(var(--accent))" : "hsl(var(--destructive))";
+
+const fmt = (n: any) => {
+  const v = Number(n);
+  if (isNaN(v) || v === 0) return "$0";
+  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+  if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
+};
+
+const modeLabel: Record<string, string> = {
+  ai_development: "AI Development",
+  ai_lean: "AI-Lean",
+  lean_product: "Lean Product Team",
+  lean_team: "Lean Team",
+  structured_startup: "Structured Startup",
+  advanced_build: "Advanced Build",
+  venture_backed: "Venture-Backed",
+};
+
+// Dummy scores data
+const dummyScores = {
+  proj1: {
+    execution_score: 78,
+    classification: "Good Execution",
+    action_directive: "Scale Cautiously",
+    execution_risk_level: "Low",
+    action_summary: "Solid execution foundation with balanced approach to growth and resource management.",
+    team_score: 82,
+    capital_score: 75,
+    speed_score: 70,
+    validation_score: 85,
+    execution_blueprint: {
+      executive_summary: {
+        execution_maturity_tier: "Execution Ready",
+        team_composition: "Balanced team with key roles covered",
+        capital_efficiency: "Good capital efficiency",
+        speed_vs_stability: "Balanced approach",
+        primary_execution_constraint: "Talent acquisition",
+        strategic_insight: "Strong execution capabilities with clear growth path and resource optimization."
+      },
+      reasoning_trace: {
+        stage_2_team: { classification: "High", reasoning: "Well-rounded team with relevant expertise" },
+        stage_3_capital: { classification: "Moderate", reasoning: "Adequate funding for current phase" },
+        stage_4_complexity: { classification: "Medium", reasoning: "Manageable technical complexity" },
+        stage_5_speed: { classification: "Balanced", reasoning: "Good balance between speed and stability" },
+        stage_6_validation: { classification: "High", reasoning: "Strong validation approach" },
+        stage_7_capacity: { classification: "Moderate", reasoning: "Sufficient operational capacity" },
+        stage_8_urgency: { classification: "Medium", reasoning: "Reasonable revenue urgency" },
+        stage_9_scale: { classification: "Moderate", reasoning: "Planned scaling approach" },
+        stage_10_commitment: { classification: "High", reasoning: "Strong team commitment" },
+        stage_11_risks: { "Technical Risk": "Low", "Market Risk": "Low", "Execution Risk": "Moderate" },
+        stage_11_constraint: "Talent acquisition"
+      },
+      scoring_audit: {
+        base_score: 75,
+        pillar_scores: {
+          team_composition: { score: 14, reasoning: "Strong team composition" },
+          capital_efficiency: { score: 13, reasoning: "Good capital utilization" },
+          technical_complexity: { score: 12, reasoning: "Manageable complexity" },
+          speed_vs_stability: { score: 12, reasoning: "Good balance" },
+          validation_approach: { score: 15, reasoning: "Thorough validation" },
+          operational_capacity: { score: 13, reasoning: "Good capacity" },
+          execution_commitment: { score: 14, reasoning: "High commitment" }
+        },
+        final_score: 78
+      },
+      execution_confidence: {
+        overall: "High",
+        team_clarity: 8,
+        capital_adequacy: 7,
+        technical_feasibility: 8,
+        speed_realism: 7,
+        validation_rigor: 8,
+        operational_readiness: 7,
+        commitment_level: 8,
+        reasoning: "Strong execution fundamentals with good team and capital alignment."
+      },
+      execution_architecture: {
+        team_structure: {
+          core_team: ["CEO", "CTO", "Product Manager"],
+          key_hires: ["Lead Engineer", "Marketing Lead", "Sales Lead"],
+          team_gaps: ["Customer Success", "Data Analyst"]
+        },
+        capital_plan: {
+          current_funding: "$150K",
+          runway: "18 months",
+          burn_rate: "$8K/month",
+          next_funding: "Seed round target",
+          allocation: { "Product": "40%", "Marketing": "30%", "Operations": "20%", "G&A": "10%" }
+        },
+        development_approach: {
+          methodology: "Agile with 2-week sprints",
+          tech_stack: "Modern full-stack with microservices",
+          deployment: "Cloud-native with CI/CD",
+          quality_gates: "Automated testing and code reviews"
+        },
+        operational_model: {
+          workflows: "Standardized development workflows",
+          decision_making: "Data-driven with clear RACI",
+          communication: "Daily standups and weekly reviews",
+          reporting: "KPI dashboards and stakeholder updates"
+        },
+        risk_mitigation: {
+          technical_risks: ["Technology debt", "Scalability challenges"],
+          market_risks: ["Competition", "Market changes"],
+          execution_risks: ["Team burnout", "Scope creep"],
+          mitigation_strategies: ["Regular refactoring", "Customer feedback loops", "Team wellness programs", "Clear scope definition"]
+        }
+      },
+      execution_engine: {
+        core_capabilities: [
+          { capability: "Product Development", maturity: "High", description: "Strong product development capabilities" },
+          { capability: "Marketing", maturity: "Medium", description: "Growing marketing function" },
+          { capability: "Sales", maturity: "Early", description: "Sales process being established" },
+          { capability: "Customer Support", maturity: "Medium", description: "Basic support structure in place" }
+        ],
+        resource_allocation: {
+          team_utilization: "85%",
+          capital_efficiency: "Good",
+          time_to_market: "4 weeks for new features",
+          quality_metrics: "95% code coverage, 4.8/5 average rating"
+        },
+        delivery_mechanics: {
+          sprint_cycle: "2 weeks",
+          release_frequency: "Bi-weekly",
+          deployment_process: "Automated CI/CD pipeline",
+          monitoring: "Real-time performance tracking"
+        }
+      }
+    }
+  }
+};
+
+export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: Phase2DashboardProps) {
+  const [scores, setScores] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showLockModal, setShowLockModal] = useState(false);
+
+  useEffect(() => { loadData(); }, [projectId]);
+
+  const loadData = async () => {
+    setLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      const data = dummyScores[projectId as keyof typeof dummyScores];
+      setScores(data);
+      setLoading(false);
+    }, 1000);
+  };
+
+  const confirmLock = async () => {
+    // Simulate phase locking
+    setTimeout(() => {
+      setShowLockModal(false);
+      toast.success("Phase 2 locked. Navigating to Phase 3...");
+      onLockProceed?.();
+    }, 1000);
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (!scores) return <div className="text-center py-16 text-muted-foreground">No scoring data yet.</div>;
+
+  const report = (scores.execution_blueprint as any) || {};
+  const exec = report.executive_summary || {};
+  const modeArch = report.mode_architecture || {};
+  const buildLogic = report.strategic_build_logic || {};
+  const productArch = report.product_architecture || {};
+  const featurePrio = report.feature_prioritization || {};
+  const teamStruct = report.team_structure || {};
+  const toolStack = report.tool_stack || {};
+  const capitalArch = report.capital_architecture || {};
+  const timeline = report.execution_timeline || [];
+  const riskClusters = report.risk_clusters || {};
+  const readinessGaps = report.build_readiness_gaps || [];
+  const investorSnap = report.investor_snapshot || {};
+  const reasoning = report.reasoning_trace || {};
+  const audit = report.scoring_audit || {};
+
+  const layerData = [
+    { layer: "Research", score: Number(scores.research_score), weight: "20%" },
+    { layer: "Scoping", score: Number(scores.scoping_score), weight: "20%" },
+    { layer: "Architecture", score: Number(scores.arch_score), weight: "20%" },
+    { layer: "Resource", score: Number(scores.resource_score), weight: "20%" },
+    { layer: "MVP", score: Number(scores.mvp_score), weight: "20%" },
+  ];
+
+  const pillarData = audit.pillar_scores ? [
+    { name: "Objective Clarity", ...audit.pillar_scores.objective_clarity },
+    { name: "Capacity Alignment", ...audit.pillar_scores.capacity_alignment },
+    { name: "Scope Discipline", ...audit.pillar_scores.scope_discipline },
+    { name: "Capital Sufficiency", ...audit.pillar_scores.capital_sufficiency },
+    { name: "Team Feasibility", ...audit.pillar_scores.team_feasibility },
+  ] : [];
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* ========== 1. EXECUTIVE EXECUTION SUMMARY ========== */}
+      <Card className="border-2 border-primary/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2 text-primary">
+            <BarChart3 className="h-5 w-5" />
+            <CardTitle className="text-lg">Executive Execution Summary</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 text-center">
+              <p className="text-3xl font-bold text-primary">{Number(scores.execution_score).toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Execution Score</p>
+            </div>
+            <div className={`rounded-xl p-4 text-center border ${classColor(scores.classification)}`}>
+              <div className="flex items-center justify-center gap-2">
+                {classIcon(scores.classification)}
+                <p className="text-base font-bold">{scores.classification}</p>
+              </div>
+              <p className="text-xs mt-1 opacity-70">Classification</p>
+            </div>
+            <div className="rounded-xl bg-accent/5 border border-accent/20 p-4 text-center">
+              <Badge className="mb-1">{modeLabel[scores.execution_mode] || scores.execution_mode}</Badge>
+              <p className="text-xs text-muted-foreground mt-1">Execution Mode</p>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div className="rounded-lg border p-3 text-center">
+              <p className="text-xl font-bold text-primary">{exec.build_confidence_index || "—"}%</p>
+              <p className="text-xs text-muted-foreground">Build Confidence</p>
+              {(exec.confidence_classification || audit.confidence_index) && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${tierColor(exec.confidence_classification || audit.confidence_index)}`}>
+                  {exec.confidence_classification || audit.confidence_index}
+                </span>
+              )}
+            </div>
+            <div className="rounded-lg border p-3 text-center">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(exec.capital_intensity_tier)}`}>{exec.capital_intensity_tier || "—"}</span>
+              <p className="text-xs text-muted-foreground mt-1">Capital Intensity</p>
+            </div>
+            <div className="rounded-lg border p-3 text-center">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(exec.complexity_tier)}`}>{exec.complexity_tier || "—"}</span>
+              <p className="text-xs text-muted-foreground mt-1">Complexity</p>
+            </div>
+          </div>
+          {exec.strategic_insight && (
+            <div className="rounded-lg bg-muted/50 p-4 border-l-4 border-primary">
+              <p className="text-sm leading-relaxed">{exec.strategic_insight}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ========== AI REASONING TRACE ========== */}
+      {Object.keys(reasoning).length > 0 && (
+        <Card className="border border-purple-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Brain className="h-4 w-4 text-purple-600" /> AI Reasoning Trace
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Stage 2: Build Objective */}
+            {reasoning.stage_2_objective && (
+              <div className="rounded-lg border p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Crosshair className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold">Build Objective</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ml-auto ${tierColor(reasoning.stage_2_objective.classification)}`}>
+                    {reasoning.stage_2_objective.classification}
+                  </span>
+                </div>
+                {reasoning.stage_2_objective.rationale && <p className="text-xs text-muted-foreground mt-1">{reasoning.stage_2_objective.rationale}</p>}
+              </div>
+            )}
+
+            {/* Stage 3: Capacity vs Ambition */}
+            {reasoning.stage_3_capacity_gap && (
+              <div className="rounded-lg border p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Scale className="h-3.5 w-3.5 text-amber-600" />
+                  <p className="text-xs font-semibold">Capacity vs Ambition</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ml-auto ${tierColor(reasoning.stage_3_capacity_gap.classification)}`}>
+                    {reasoning.stage_3_capacity_gap.classification}
+                  </span>
+                </div>
+                {reasoning.stage_3_capacity_gap.gap_detail && <p className="text-xs text-muted-foreground mt-1">{reasoning.stage_3_capacity_gap.gap_detail}</p>}
+              </div>
+            )}
+
+            {/* Stages 4-8 summary grid */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {reasoning.stage_4_capital && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">Capital Structure</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_4_capital.classification)}`}>
+                    {reasoning.stage_4_capital.classification}
+                  </span>
+                </div>
+              )}
+              {reasoning.stage_5_team && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">Team Feasibility</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_5_team.classification)}`}>
+                    {reasoning.stage_5_team.classification}
+                  </span>
+                </div>
+              )}
+              {reasoning.stage_7_architecture && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">Architecture Tier</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_7_architecture.tier)}`}>
+                    {reasoning.stage_7_architecture.tier}
+                  </span>
+                </div>
+              )}
+              {reasoning.stage_8_timeline && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">Timeline Realism</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_8_timeline.classification)}`}>
+                    {reasoning.stage_8_timeline.classification}
+                  </span>
+                </div>
+              )}
+              {reasoning.stage_10_maturity && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">Execution Maturity</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_10_maturity.tier)}`}>
+                    {reasoning.stage_10_maturity.tier}
+                  </span>
+                </div>
+              )}
+              {reasoning.stage_9_risks && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">High Risk Clusters</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${reasoning.stage_9_risks.high_risk_count >= 3 ? "bg-red-100 text-red-800" : reasoning.stage_9_risks.high_risk_count >= 1 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}>
+                    {reasoning.stage_9_risks.high_risk_count} of 5
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Scope compression / MVES */}
+            {reasoning.stage_6_scope?.mves_definition && (
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                <p className="text-xs font-semibold text-primary mb-1">Minimum Viable Execution Scope (MVES)</p>
+                <p className="text-xs text-muted-foreground">{reasoning.stage_6_scope.mves_definition}</p>
+                {reasoning.stage_6_scope.scope_compression_applied && (
+                  <Badge variant="outline" className="text-[9px] mt-2 border-amber-300 text-amber-700">Scope Compression Applied</Badge>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== SCORING DECISION AUDIT ========== */}
+      {pillarData.length > 0 && (
+        <Card className="border border-indigo-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-indigo-600" /> Scoring Decision Audit
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Pillar scores */}
+            <div className="space-y-3">
+              {pillarData.map((p) => (
+                <div key={p.name}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">{p.name} <span className="text-muted-foreground">(0-20)</span></span>
+                    <div className="flex items-center gap-2">
+                      {p.cap_applied && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">Cap: {p.cap_applied}</span>}
+                      <span className="font-bold" style={{ color: getBarColor((p.score / 20) * 100) }}>{p.score}</span>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(p.score / 20) * 100}%`, backgroundColor: getBarColor((p.score / 20) * 100) }} />
+                  </div>
+                  {p.rationale && <p className="text-[10px] text-muted-foreground mt-1">{p.rationale}</p>}
+                </div>
+              ))}
+            </div>
+
+            <Separator />
+
+            {/* Score flow */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold">{audit.base_score}</p>
+                <p className="text-[10px] text-muted-foreground">Base Score</p>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-amber-600">{audit.score_after_caps}</p>
+                <p className="text-[10px] text-muted-foreground">After Caps</p>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-destructive">{audit.risk_penalty ? `-${audit.risk_penalty}` : "0"}</p>
+                <p className="text-[10px] text-muted-foreground">Risk Penalty</p>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-green-600">+{audit.maturity_boost || 0}</p>
+                <p className="text-[10px] text-muted-foreground">Maturity Boost</p>
+              </div>
+            </div>
+
+            {/* Hard caps applied */}
+            {audit.hard_caps_applied?.length > 0 && audit.hard_caps_applied[0] !== "None" && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                <p className="text-xs font-semibold text-red-700 mb-1">Hard Caps Applied</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {audit.hard_caps_applied.map((cap: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-[9px] border-red-300 text-red-700">{cap}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Final score comparison */}
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Final Execution Score</p>
+                <p className="text-2xl font-bold text-primary">{audit.final_execution_score}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Confidence Index</p>
+                <span className={`text-sm font-bold px-3 py-1 rounded-full ${tierColor(audit.confidence_index)}`}>
+                  {audit.confidence_index}
+                </span>
+              </div>
+            </div>
+
+            {audit.confidence_rationale && (
+              <p className="text-xs text-muted-foreground border-l-2 border-indigo-200 pl-3">{audit.confidence_rationale}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== LAYER BREAKDOWN ========== */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Eye className="h-4 w-4 text-muted-foreground" /> Layer Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {layerData.map((entry) => {
+              const tooltip = getLayerTooltip(entry.layer, entry.score);
+              return (
+                <ScoreTooltip key={entry.layer} label={entry.layer} score={entry.score} meaning={tooltip.meaning} reason={tooltip.reason} improvement={tooltip.improvement}>
+                  <div className="cursor-help">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{entry.layer} <span className="text-muted-foreground">({entry.weight})</span></span>
+                      <span className="font-bold" style={{ color: getBarColor(entry.score) }}>{entry.score.toFixed(0)}</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${entry.score}%`, backgroundColor: getBarColor(entry.score) }} />
+                    </div>
+                  </div>
+                </ScoreTooltip>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ========== 2. MODE ARCHITECTURE ========== */}
+      {modeArch.mode_comparison && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-4 w-4 text-indigo-600" /> Execution Mode Architecture
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-medium text-muted-foreground">Mode</th>
+                    <th className="text-center py-2 font-medium text-muted-foreground">Team</th>
+                    <th className="text-center py-2 font-medium text-muted-foreground">Capital</th>
+                    <th className="text-center py-2 font-medium text-muted-foreground">Timeline</th>
+                    <th className="text-center py-2 font-medium text-muted-foreground">Risk</th>
+                    <th className="text-center py-2 font-medium text-muted-foreground">Scale</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {modeArch.mode_comparison.map((m: any, i: number) => {
+                    const isSelected = m.mode?.toLowerCase().includes(modeArch.selected_mode?.name?.toLowerCase()?.split(" ")[0] || "___");
+                    return (
+                      <tr key={i} className={`border-b ${isSelected ? "bg-accent/5 font-semibold" : ""}`}>
+                        <td className="py-2 pr-2">{m.mode} {isSelected && <Badge variant="outline" className="text-[9px] ml-1">Selected</Badge>}</td>
+                        <td className="py-2 text-center">{m.team_size}</td>
+                        <td className="py-2 text-center">{m.capital}</td>
+                        <td className="py-2 text-center">{m.timeline}</td>
+                        <td className="py-2 text-center"><span className={`px-1.5 py-0.5 rounded-full text-[10px] ${severityColor(m.risk)}`}>{m.risk}</span></td>
+                        <td className="py-2 text-center">{m.scalability}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 3. STRATEGIC BUILD LOGIC ========== */}
+      {(buildLogic.build_first || buildLogic.core_value_loop) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Brain className="h-4 w-4 text-purple-600" /> Strategic Build Logic
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              {buildLogic.build_first && (
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-medium text-primary mb-1">🏗 Build First</p>
+                  <p className="text-sm">{buildLogic.build_first}</p>
+                </div>
+              )}
+              {buildLogic.do_not_build && (
+                <div className="rounded-lg border border-destructive/20 p-3">
+                  <p className="text-xs font-medium text-destructive mb-1">🚫 Do NOT Build</p>
+                  <p className="text-sm">{buildLogic.do_not_build}</p>
+                </div>
+              )}
+            </div>
+            {buildLogic.scope_rationale && (
+              <p className="text-sm text-muted-foreground border-l-2 border-purple-200 pl-3">{buildLogic.scope_rationale}</p>
+            )}
+            {buildLogic.validation_leverage && (
+              <div className="rounded-lg bg-accent/5 border border-accent/20 p-3">
+                <p className="text-xs font-medium text-accent mb-1">⚡ Validation Leverage</p>
+                <p className="text-sm">{buildLogic.validation_leverage}</p>
+              </div>
+            )}
+            {buildLogic.core_value_loop && (
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-4">
+                <p className="text-xs font-semibold text-primary mb-3">Core Value Loop</p>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="bg-card border rounded-lg px-3 py-1.5 font-medium">{buildLogic.core_value_loop.user_action}</span>
+                  <ArrowRight className="h-3 w-3 text-primary" />
+                  <span className="bg-card border rounded-lg px-3 py-1.5 font-medium">{buildLogic.core_value_loop.system_action}</span>
+                  <ArrowRight className="h-3 w-3 text-primary" />
+                  <span className="bg-card border rounded-lg px-3 py-1.5 font-medium">{buildLogic.core_value_loop.value_delivery}</span>
+                  <ArrowRight className="h-3 w-3 text-accent" />
+                  <span className="bg-accent/10 border border-accent/20 rounded-lg px-3 py-1.5 font-medium text-accent">{buildLogic.core_value_loop.revenue_trigger}</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 4. PRODUCT ARCHITECTURE ========== */}
+      {(productArch.core_modules || productArch.supporting_modules) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-4 w-4 text-blue-600" /> Product Architecture Framework
+              {productArch.over_engineering_risk && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ml-auto ${severityColor(productArch.over_engineering_risk)}`}>
+                  Over-engineering: {productArch.over_engineering_risk}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              {productArch.core_modules?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-primary mb-2">Core Modules</p>
+                  <div className="space-y-2">
+                    {productArch.core_modules.map((m: any, i: number) => (
+                      <div key={i} className="rounded-lg border p-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{m.name}</p>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${severityColor(m.priority === "Critical" ? "High" : m.priority)}`}>{m.priority}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{m.purpose}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {productArch.supporting_modules?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Supporting Modules</p>
+                  <div className="space-y-2">
+                    {productArch.supporting_modules.map((m: any, i: number) => (
+                      <div key={i} className="rounded-lg border p-2">
+                        <p className="text-sm font-medium">{m.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{m.purpose}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {productArch.data_model_logic && (
+              <p className="text-sm text-muted-foreground border-l-2 border-blue-200 pl-3">{productArch.data_model_logic}</p>
+            )}
+            {productArch.external_dependencies?.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1">External Dependencies:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {productArch.external_dependencies.map((d: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 5. FEATURE PRIORITIZATION ========== */}
+      {(featurePrio.core_features || featurePrio.nice_to_have || featurePrio.cut) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Target className="h-4 w-4 text-green-600" /> Feature Prioritization Map
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {featurePrio.core_features?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-primary mb-2">Core Features</p>
+                <div className="space-y-2">
+                  {featurePrio.core_features.map((f: any, i: number) => (
+                    <div key={i} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <p className="text-sm font-medium">{f.feature}</p>
+                          </div>
+                          {f.why && <p className="text-xs text-muted-foreground mt-1 ml-5">{f.why}</p>}
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          {f.validation_leverage && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${tierColor(f.validation_leverage)}`}>Val: {f.validation_leverage}</span>}
+                          {f.revenue_impact && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${tierColor(f.revenue_impact)}`}>Rev: {f.revenue_impact}</span>}
+                          {f.complexity && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${severityColor(f.complexity)}`}>Cplx: {f.complexity}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid sm:grid-cols-2 gap-4">
+              {featurePrio.nice_to_have?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-accent mb-2">Nice to Have</p>
+                  {featurePrio.nice_to_have.map((f: any, i: number) => (
+                    <div key={i} className="text-xs flex gap-1.5 items-start py-1">
+                      <span className="text-accent mt-0.5">○</span>
+                      <span>{f.feature || f}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {featurePrio.cut?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-destructive mb-2">Cut</p>
+                  {featurePrio.cut.map((f: any, i: number) => (
+                    <div key={i} className="text-xs flex gap-1.5 items-start py-1">
+                      <XCircle className="h-3 w-3 text-destructive mt-0.5 shrink-0" />
+                      <div>
+                        <span>{f.feature || f}</span>
+                        {f.why_cut && <span className="text-muted-foreground ml-1">— {f.why_cut}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 6. TEAM STRUCTURE ========== */}
+      {teamStruct.roles?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Team Structure Model
+              {teamStruct.total_monthly_burn > 0 && (
+                <span className="text-xs text-muted-foreground ml-auto font-normal">Monthly burn: <strong className="text-primary">{fmt(teamStruct.total_monthly_burn)}</strong></span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              {teamStruct.roles.map((r: any, i: number) => (
+                <div key={i} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold">{r.title} <span className="text-muted-foreground font-normal">×{r.count}</span></p>
+                    {r.cost_monthly > 0 && <span className="text-xs font-medium text-primary">{fmt(r.cost_monthly)}/mo</span>}
+                  </div>
+                  {r.why_needed && <p className="text-xs text-muted-foreground">{r.why_needed}</p>}
+                  <div className="flex gap-2 mt-2">
+                    {r.when_needed && <Badge variant="outline" className="text-[9px]">{r.when_needed}</Badge>}
+                    {r.commitment && <Badge variant="outline" className="text-[9px]">{r.commitment}</Badge>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {teamStruct.hiring_sequence_note && (
+              <p className="text-sm text-muted-foreground border-l-2 border-primary/30 pl-3">{teamStruct.hiring_sequence_note}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 7. TOOL STACK (Interactive) ========== */}
+      {(toolStack.option_a || toolStack.option_b) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-accent" /> Tool Stack System
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeStack} onValueChange={setActiveStack}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="option_a">{toolStack.option_a?.label || "Option A: AI-Optimized"}</TabsTrigger>
+                <TabsTrigger value="option_b">{toolStack.option_b?.label || "Option B: Traditional"}</TabsTrigger>
+              </TabsList>
+              {["option_a", "option_b"].map((opt) => (
+                <TabsContent key={opt} value={opt}>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {(toolStack[opt]?.tools || []).map((t: any, i: number) => (
+                      <div key={i} className="rounded-lg border p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-medium">{t.tool}</p>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${tierColor(t.cost_tier === "Free" ? "strong" : t.cost_tier)}`}>{t.cost_tier}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{t.category}</p>
+                        {t.why && <p className="text-xs text-muted-foreground">{t.why}</p>}
+                        {t.scalability && <p className="text-[10px] mt-1">Scale: <span className="font-medium">{t.scalability}</span></p>}
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 8. CAPITAL ARCHITECTURE ========== */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-green-600" /> Capital Architecture
+            {capitalArch.capital_exposure_risk && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ml-auto ${severityColor(capitalArch.capital_exposure_risk)}`}>
+                Exposure: {capitalArch.capital_exposure_risk}
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: "Build Capital", value: capitalArch.build_capital || scores.budget_realistic },
+              { label: "6mo Runway", value: capitalArch.runway_capital_6m },
+              { label: "12mo Runway", value: capitalArch.runway_capital_12m },
+              { label: "Marketing", value: capitalArch.marketing_capital },
+              { label: "Buffer", value: capitalArch.buffer_capital },
+              { label: "Risk Capital", value: capitalArch.risk_capital },
+            ].map((item) => item.value ? (
+              <div key={item.label} className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-primary">{fmt(item.value)}</p>
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+              </div>
+            ) : null)}
+          </div>
+          {capitalArch.total_12m > 0 && (
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-center">
+              <p className="text-2xl font-bold text-primary">{fmt(capitalArch.total_12m)}</p>
+              <p className="text-xs text-muted-foreground">Total 12-Month Capital Requirement</p>
+            </div>
+          )}
+          {capitalArch.breakeven_sensitivity && (
+            <p className="text-sm text-muted-foreground border-l-2 border-green-200 pl-3">{capitalArch.breakeven_sensitivity}</p>
+          )}
+          {!capitalArch.build_capital && (
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold">{fmt(scores.budget_best)}</p>
+                <p className="text-xs text-muted-foreground">Best Case</p>
+              </div>
+              <div className="rounded-lg border border-accent/20 p-3 text-center">
+                <p className="text-lg font-bold text-accent">{fmt(scores.budget_realistic)}</p>
+                <p className="text-xs text-muted-foreground">Realistic</p>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-destructive">{fmt(scores.budget_risk)}</p>
+                <p className="text-xs text-muted-foreground">Risk Case</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ========== 9. EXECUTION TIMELINE ========== */}
+      {timeline.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" /> Execution Timeline Model
+              <span className="text-xs text-muted-foreground ml-auto font-normal">{Number(scores.timeline_min_weeks).toFixed(0)}–{Number(scores.timeline_max_weeks).toFixed(0)} weeks + {Number(scores.timeline_buffer_weeks).toFixed(0)}w buffer</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {timeline.map((p: any, i: number) => (
+                <div key={i} className="rounded-lg border p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-sm font-semibold">{p.phase}</h5>
+                    <Badge variant="outline" className="text-xs">{p.weeks}</Badge>
+                  </div>
+                  {p.deliverables?.length > 0 && (
+                    <ul className="space-y-1 mb-2">
+                      {p.deliverables.map((d: string, j: number) => (
+                        <li key={j} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                          <CheckCircle2 className="h-3 w-3 text-primary mt-0.5 shrink-0" />{d}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex flex-wrap gap-3 text-[10px]">
+                    {p.validation_milestone && (
+                      <span className="bg-primary/5 text-primary px-2 py-0.5 rounded-full">
+                        🎯 {p.validation_milestone}
+                      </span>
+                    )}
+                    {p.go_no_go && (
+                      <span className="bg-accent/5 text-accent px-2 py-0.5 rounded-full">
+                        ✅ {p.go_no_go}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 10. RISK CLUSTERS ========== */}
+      {Object.keys(riskClusters).length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Shield className="h-4 w-4 text-destructive" /> Execution Risk Clusters
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { label: "Scope Risk", data: riskClusters.scope_risk },
+                { label: "Technical Risk", data: riskClusters.technical_risk },
+                { label: "Talent Risk", data: riskClusters.talent_risk },
+                { label: "Capital Risk", data: riskClusters.capital_risk },
+                { label: "Time Risk", data: riskClusters.time_risk },
+              ].map(({ label, data }) => data ? (
+                <div key={label} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h6 className="text-sm font-semibold">{label}</h6>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${severityColor(data.severity)}`}>{data.severity}</span>
+                  </div>
+                  {data.trigger && <p className="text-xs text-muted-foreground"><span className="font-medium">Trigger:</span> {data.trigger}</p>}
+                  {data.mitigation && <p className="text-xs"><span className="font-medium text-primary">Mitigate:</span> {data.mitigation}</p>}
+                </div>
+              ) : null)}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 11. BUILD READINESS GAPS ========== */}
+      {readinessGaps.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <HelpCircle className="h-4 w-4 text-amber-600" /> Build Readiness Gaps
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {readinessGaps.map((gap: any, i: number) => (
+                <div key={i} className="rounded-lg border p-3 flex items-start gap-3">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 border ${severityColor(gap.importance)}`}>{gap.importance}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{gap.gap}</p>
+                    {gap.action_required && <p className="text-xs text-muted-foreground mt-1"><span className="font-medium">Action:</span> {gap.action_required}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== 12. INVESTOR SNAPSHOT ========== */}
+      {(investorSnap.capital_required_12m || investorSnap.time_to_mvp) && (
+        <Card className="border-2 border-accent/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-accent" /> Investor Snapshot
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {investorSnap.capital_required_12m && (
+                <div className="rounded-lg bg-accent/5 border border-accent/20 p-4 text-center">
+                  <p className="text-xl font-bold text-accent">{fmt(investorSnap.capital_required_12m)}</p>
+                  <p className="text-xs text-muted-foreground">12mo Capital Required</p>
+                </div>
+              )}
+              {investorSnap.time_to_mvp && (
+                <div className="rounded-lg border p-4 text-center">
+                  <p className="text-xl font-bold text-primary">{investorSnap.time_to_mvp}</p>
+                  <p className="text-xs text-muted-foreground">Time to MVP</p>
+                </div>
+              )}
+              {investorSnap.primary_risk && (
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs font-medium text-destructive mb-1">Primary Risk</p>
+                  <p className="text-sm">{investorSnap.primary_risk}</p>
+                </div>
+              )}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              {investorSnap.breakeven_hypothesis && (
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Break-even Hypothesis</p>
+                  <p className="text-sm">{investorSnap.breakeven_hypothesis}</p>
+                </div>
+              )}
+              {investorSnap.strategic_advantage && (
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-medium text-primary mb-1">Strategic Advantage</p>
+                  <p className="text-sm">{investorSnap.strategic_advantage}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== ACTIONS ========== */}
+      <div className="flex flex-wrap gap-3 justify-center pt-4">
+        <Button variant="outline" className="gap-2" onClick={onRerun}><RotateCcw className="h-4 w-4" /> Re-run Analysis</Button>
+        <Button variant="hero" className="gap-2" onClick={() => setShowLockModal(true)}>
+          <Lock className="h-4 w-4" /> Lock & Proceed to Phase 3
+        </Button>
+      </div>
+
+      {/* Lock Confirmation Modal */}
+      <Dialog open={showLockModal} onOpenChange={setShowLockModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lock Phase 2 & Proceed?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Locking Phase 2 will finalize your execution blueprint. You can still view the results but won't be able to re-run scoring. Proceed to Phase 3 (GTM & Growth)?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLockModal(false)}>Cancel</Button>
+            <Button variant="hero" onClick={confirmLock}>Lock & Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
