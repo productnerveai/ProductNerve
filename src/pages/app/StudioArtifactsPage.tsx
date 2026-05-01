@@ -4,15 +4,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { FileText, BookOpen, Users, FlaskConical, TrendingUp, Map, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface Artifact {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   status: string;
-  project_id: string | null;
-  workspace_id: string;
-  created_at: string;
-  updated_at: string;
+  project_id?: { _id: string; name: string } | string | null;
+  workspace_id?: { _id: string; name: string } | string;
+  createdAt: string;
+  updatedAt: string;
+  type?: string;
 }
 
 const TOOL_TABS = [
@@ -24,126 +27,74 @@ const TOOL_TABS = [
   { key: "roadmaps", label: "Roadmaps", icon: Map, table: "roadmaps" as const },
 ];
 
-// Dummy artifacts data
-const dummyArtifacts: Record<string, Artifact[]> = {
-  prd: [
-    {
-      id: "prd1",
-      title: "AI Project Manager PRD",
-      status: "complete",
-      project_id: "proj1",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: "prd2",
-      title: "Customer Analytics Platform PRD",
-      status: "draft",
-      project_id: "proj2",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ],
-  stories: [
-    {
-      id: "story1",
-      title: "User Authentication Story",
-      status: "complete",
-      project_id: "proj1",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: "story2",
-      title: "Project Creation Story",
-      status: "draft",
-      project_id: "proj1",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ],
-  icp: [
-    {
-      id: "icp1",
-      title: "SaaS Startup ICP",
-      status: "complete",
-      project_id: "proj1",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: "icp2",
-      title: "E-commerce ICP",
-      status: "draft",
-      project_id: "proj2",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ],
-  experiments: [
-    {
-      id: "exp1",
-      title: "Landing Page A/B Test",
-      status: "complete",
-      project_id: "proj1",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ],
-  growth: [
-    {
-      id: "growth1",
-      title: "User Acquisition Strategy",
-      status: "draft",
-      project_id: "proj2",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ],
-  roadmaps: [
-    {
-      id: "roadmap1",
-      title: "Q1 2024 Product Roadmap",
-      status: "complete",
-      project_id: "proj1",
-      workspace_id: "workspace1",
-      created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ]
-};
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function StudioArtifactsPage() {
   const navigate = useNavigate();
+  const { activeWorkspace } = useWorkspace();
   const [artifacts, setArtifacts] = useState<Record<string, Artifact[]>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("prd");
 
   useEffect(() => {
-    // Simulate loading artifacts
-    setTimeout(() => {
-      setArtifacts(dummyArtifacts);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    loadAllArtifacts();
+  }, [activeWorkspace]);
 
-  const deleteArtifact = async (table: string, id: string) => {
-    // Simulate deletion
-    setTimeout(() => {
-      setArtifacts(prev => ({
-        ...prev,
-        [activeTab]: prev[activeTab].filter(a => a.id !== id)
-      }));
-      toast.success("Artifact deleted");
-    }, 500);
+  const loadAllArtifacts = async () => {
+    if (!activeWorkspace) return;
+    
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const workspaceId = activeWorkspace._id || activeWorkspace.id;
+      
+      const response = await fetch(`${API_BASE_URL}/artifacts?workspace_id=${workspaceId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const formattedArtifacts: Record<string, Artifact[]> = {
+          prd: data.data.prd.artifacts || [],
+          stories: data.data.stories.artifacts || [],
+          icp: data.data.icp.artifacts || [],
+          experiments: data.data.experiments.artifacts || [],
+          growth: data.data.growth.artifacts || [],
+          roadmaps: data.data.roadmaps.artifacts || []
+        };
+        setArtifacts(formattedArtifacts);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to load artifacts");
+      }
+    } catch {
+      toast.error("Network error while loading artifacts");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteArtifact = async (type: string, id: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/artifacts/${type}/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        setArtifacts(prev => ({
+          ...prev,
+          [type]: prev[type].filter(a => (a._id || a.id) !== id)
+        }));
+        toast.success("Artifact deleted successfully");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to delete artifact");
+      }
+    } catch {
+      toast.error("Network error while deleting artifact");
+    }
   };
 
   const getToolPath = (key: string) => {
@@ -196,19 +147,19 @@ export default function StudioArtifactsPage() {
             ) : (
               <div className="space-y-2">
                 {(artifacts[tab.key] || []).map((a) => (
-                  <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                  <div key={a._id || a.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                     <tab.icon className="h-4 w-4 text-accent shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{a.title}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {new Date(a.created_at).toLocaleDateString()} • {a.status}
+                        {new Date(a.createdAt || a.updatedAt).toLocaleDateString()} • {a.status}
                       </p>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(getToolPath(tab.key))}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(`${getToolPath(tab.key)}/${a._id || a.id}`)}>
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteArtifact(tab.key, a.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteArtifact(tab.key, a._id || a.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>

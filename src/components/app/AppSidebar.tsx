@@ -1,6 +1,27 @@
-import { useLocation, Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import logoMark from "@/assets/logo-mark.png";
-import { LayoutDashboard, FolderKanban, Settings, LogOut, Shield, CreditCard, Rocket, ChevronDown, Users, FlaskConical, TrendingUp, Map, BookOpen, FileText, Archive, Briefcase, LifeBuoy } from "lucide-react";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  CreditCard,
+  Settings,
+  LifeBuoy,
+  Rocket,
+  ChevronDown,
+  Briefcase,
+  Shield,
+  LogOut,
+  Users,
+  TrendingUp,
+  FlaskConical,
+  Map,
+  BookOpen,
+  FileText,
+  Archive,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,7 +34,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useState } from "react";
 
 const NON_BETA_TOOLS = ["ICP Builder", "User Story Generator", "PRD Generator"];
 
@@ -30,13 +50,15 @@ const studioTools = [
 export default function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { activeWorkspace } = useWorkspace();
   const [studioOpen, setStudioOpen] = useState(location.pathname.startsWith("/app/studio"));
 
-  // Dummy data - simulate active workspace and admin status
-  const activeWorkspace = { id: "ws1", name: "Product Development" };
-  const isAdmin = true; // Set to true to see admin section
+  // Check if user has admin access
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await logout();
     navigate("/");
   };
 
@@ -69,14 +91,14 @@ export default function AppSidebar() {
               </SidebarMenuItem>
 
               {activeWorkspace && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/app/projects")}>
-                    <Link to="/app/projects">
-                      <FolderKanban className="h-4 w-4" />
-                      <span>Projects</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/app/projects")}>
+                  <Link to="/app/projects">
+                    <FolderKanban className="h-4 w-4" />
+                    <span>Projects</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               )}
 
               <SidebarMenuItem>
@@ -188,6 +210,6 @@ export default function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-    </Sidebar>
+      </Sidebar>
   );
 }

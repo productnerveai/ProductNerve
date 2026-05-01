@@ -3,12 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import logoMark from "@/assets/logo-mark.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { trackEvent, getAttributionData } from "@/lib/tracking";
 
 export default function SignupPage() {
-  // const { signUp } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -30,16 +30,17 @@ export default function SignupPage() {
     setLoading(true);
     trackEvent('signup_started', { email });
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    // const { error } = await signUp(email, password, fullName, companyName.trim() || undefined);
+    const { error } = await signUp(email, password, fullName, companyName.trim() || undefined);
     setLoading(false);
-    toast.success("Check your email to verify your account!");
-    navigate("/login");
-    // if (error) {
-    //   toast.error(error.message);
-    // } else {
-    //   const attribution = getAttributionData();
-    //   trackEvent('signup_completed', { email, ...attribution.first_touch });
-    // }
+    
+    if (error) {
+      toast.error(error);
+    } else {
+      const attribution = getAttributionData();
+      trackEvent('signup_completed', { email, ...attribution.first_touch });
+      toast.success("Check your email to verify your account!");
+      navigate("/login");
+    }
   };
 
   return (

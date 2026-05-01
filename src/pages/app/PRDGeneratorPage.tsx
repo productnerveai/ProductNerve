@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,8 @@ import { toast } from "sonner";
 import { FileText, ArrowRight, ArrowLeft, Save, Plus, Loader2, Sparkles, Link2, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import ToolGate from "@/components/tools/ToolGate";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useProject } from "@/contexts/ProjectContext";
 
 const STEPS = ["PRD Type", "Product Context", "Strategic Context", "Product Definition", "Execution Context", "Generate"];
 
@@ -67,86 +70,13 @@ const SECTION_LABELS: Record<string, string> = {
   integrationRequirements: "Integration Requirements",
 };
 
-// Dummy data
-const dummyUser = { id: "user123" };
-const dummyWorkspace = { id: "workspace1", name: "Default Workspace" };
-
-const dummyPRDs = [
-  {
-    id: "prd1",
-    title: "AI Project Manager PRD",
-    prd_type: "simple",
-    product_context: {
-      productName: "AI Project Manager",
-      productDescription: "AI-powered project management tool for startups",
-      problemSolved: "Inefficient team collaboration and project tracking",
-      targetUsers: "Startup founders and project managers",
-      businessGoal: "Achieve product-market fit in 6 months"
-    },
-    strategic_context: {
-      marketOpportunity: "$50B project management market with 15% CAGR",
-      keyAssumptions: "Teams will adopt AI for productivity gains",
-      constraints: "Limited engineering resources",
-      risks: "Competition from established players"
-    },
-    product_definition: {
-      coreFeatures: "AI task assignment, automated reporting, team analytics",
-      userFlows: "Onboarding → Project creation → AI recommendations",
-      valueProp: "Reduce project management overhead by 40%"
-    },
-    execution_context: {
-      timeline: "6 months",
-      teamSize: "4 engineers, 1 designer, 1 PM",
-      technicalComplexity: "Medium"
-    },
-    report: {
-      productInformation: "AI Project Manager is a cutting-edge solution...",
-      goalsAndObjectives: "Primary goal: Streamline project management workflows...",
-      targetUsers: "Startup teams, SMB project managers, remote teams..."
-    },
-    status: "complete",
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: "prd2",
-    title: "E-commerce Analytics PRD",
-    prd_type: "growth",
-    product_context: {
-      productName: "Customer Analytics Platform",
-      productDescription: "Real-time customer behavior analytics",
-      problemSolved: "Limited customer insights and personalization",
-      targetUsers: "E-commerce managers",
-      businessGoal: "Increase customer retention by 25%"
-    },
-    strategic_context: {
-      marketOpportunity: "Growing e-commerce analytics market",
-      keyAssumptions: "Businesses want actionable insights",
-      constraints: "Data privacy regulations",
-      risks: "Data integration challenges"
-    },
-    product_definition: {
-      coreFeatures: "Real-time analytics, customer segmentation",
-      userFlows: "Data integration → Dashboard setup → Insight generation",
-      valueProp: "Actionable customer insights in real-time"
-    },
-    execution_context: {
-      timeline: "4 months",
-      teamSize: "3 engineers, 1 data scientist",
-      technicalComplexity: "High"
-    },
-    report: null,
-    status: "draft",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-const dummyProjects = [
-  { id: "proj1", name: "AI Project Manager" },
-  { id: "proj2", name: "Customer Analytics Platform" },
-  { id: "proj3", name: "Supply Chain Optimizer" }
-];
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function PRDGeneratorPage() {
+  const { prdId } = useParams();
+  const { activeWorkspace } = useWorkspace();
+  const { projects } = useProject();
+  
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState("Untitled PRD");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -159,112 +89,342 @@ export default function PRDGeneratorPage() {
   const [generating, setGenerating] = useState(false);
   const [linkProjectOpen, setLinkProjectOpen] = useState(false);
   const [saved, setSaved] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [prdToDelete, setPrdToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Simulate loading saved PRDs and projects
-    setTimeout(() => {
-      setSaved(dummyPRDs);
-      setProjects(dummyProjects);
+    if (prdId) {
+      loadPRD(prdId);
+    } else {
+      loadSavedPRDs();
+    }
+  }, [prdId, activeWorkspace]);
+
+  const loadSavedPRDs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const workspaceId = activeWorkspace?._id || activeWorkspace?.id;
+      
+      if (!workspaceId) {
+        console.error('No workspace ID found');
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/prd?workspace_id=${workspaceId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSaved(data.data.prds || []);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to load PRDs");
+      }
+    } catch {
+      toast.error("Network error while loading PRDs");
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
+
+  const loadPRD = async (id: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/prd/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const prd = data.data;
+        
+        setEditingId(prd._id || prd.id);
+        setTitle(prd.title);
+        setPrdType(prd.prd_type);
+        
+        // Map backend snake_case to frontend camelCase
+        const pc = prd.product_context || {};
+        setProductContext({
+          productName: pc.product_name || "",
+          productDescription: pc.product_description || "",
+          problemSolved: pc.problem_solved || "",
+          targetUsers: pc.target_users || "",
+          businessGoal: pc.business_goal || ""
+        });
+        
+        const sc = prd.strategic_context || {};
+        setStrategicContext({
+          marketOpportunity: sc.market_opportunity || "",
+          keyAssumptions: sc.key_assumptions || "",
+          constraints: sc.constraints || "",
+          risks: sc.risks || ""
+        });
+        
+        const pd = prd.product_definition || {};
+        setProductDefinition({
+          coreFeatures: pd.core_features || "",
+          userFlows: pd.user_flows || "",
+          valueProp: pd.value_prop || ""
+        });
+        
+        const ec = prd.execution_context || {};
+        setExecutionContext({
+          timeline: ec.timeline || "",
+          teamSize: ec.team_size || "",
+          technicalComplexity: ec.technical_complexity || ""
+        });
+        
+        setReport(prd.report || null);
+        setLinkedProjectId(prd.project_id);
+        setStep(0);
+        
+        toast.success("PRD loaded successfully");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to load PRD");
+      }
+    } catch {
+      toast.error("Network error while loading PRD");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const buildPayload = (projectId?: string) => {
+    const workspaceId = activeWorkspace?._id || activeWorkspace?.id;
+    
+    if (!workspaceId) {
+      throw new Error("No workspace ID found");
+    }
+
+    
+    // Ensure we only use the string ID, not the full object
+    let finalProjectId = projectId || linkedProjectId;
+    if (finalProjectId && typeof finalProjectId === 'object') {
+      const projectObj = finalProjectId as any;
+      finalProjectId = projectObj._id || projectObj.id;
+    }
+
+    const payload = {
+      title,
+      prd_type: prdType,
+      product_context: {
+        product_name: productContext.productName,
+        product_description: productContext.productDescription,
+        problem_solved: productContext.problemSolved,
+        target_users: productContext.targetUsers,
+        business_goal: productContext.businessGoal
+      },
+      strategic_context: {
+        market_opportunity: strategicContext.marketOpportunity,
+        key_assumptions: strategicContext.keyAssumptions,
+        constraints: strategicContext.constraints,
+        risks: strategicContext.risks
+      },
+      product_definition: {
+        core_features: productDefinition.coreFeatures,
+        user_flows: productDefinition.userFlows,
+        value_prop: productDefinition.valueProp
+      },
+      execution_context: {
+        timeline: executionContext.timeline,
+        team_size: executionContext.teamSize,
+        technical_complexity: executionContext.technicalComplexity
+      },
+      workspace_id: workspaceId,
+      ...(finalProjectId ? { project_id: finalProjectId } : {}),
+    };
+    
+    console.log('Final payload project_id:', payload.project_id);
+    return payload;
+  };
 
   const savePRD = async (projectId?: string) => {
     setSaving(true);
     try {
-      // Simulate saving
-      setTimeout(() => {
-        const newPRD = {
-          id: editingId || `prd${Date.now()}`,
-          title,
-          prd_type: prdType,
-          product_context: productContext,
-          strategic_context: strategicContext,
-          product_definition: productDefinition,
-          execution_context: executionContext,
-          report: report || {},
-          status: report ? "complete" : "draft",
-          created_at: new Date().toISOString(),
-          ...(projectId ? { project_id: projectId } : {})
-        };
+      const token = localStorage.getItem('token');
+      const payload = buildPayload(projectId);
+      const url = editingId ? `${API_BASE_URL}/prd/${editingId}` : `${API_BASE_URL}/prd`;
+      const method = editingId ? 'PUT' : 'POST';
+      
+      console.log('=== SAVE PRD DEBUG ===');
+      console.log('Payload:', payload);
+      console.log('URL:', url);
+      console.log('Method:', method);
+      console.log('==================');
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const savedPRD = data.data;
         
-        if (editingId) {
-          setSaved(prev => prev.map(prd => prd.id === editingId ? newPRD : prd));
-        } else {
-          setSaved(prev => [newPRD, ...prev]);
-          setEditingId(newPRD.id);
+        if (!editingId) {
+          setEditingId(savedPRD._id || savedPRD.id);
         }
         
-        toast.success("PRD saved");
-        setSaving(false);
-      }, 1500);
-    } catch (e: any) {
-      toast.error("Error saving PRD");
+        if (savedPRD.project_id) setLinkedProjectId(savedPRD.project_id);
+        toast.success("PRD saved successfully");
+        await loadSavedPRDs();
+      } else {
+        const errorText = await response.text();
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { error: errorText };
+        }
+        console.error('=== SAVE PRD ERROR ===');
+        console.error('Backend error response:', error);
+        console.error('Raw error text:', errorText);
+        console.error('Response status:', response.status);
+        console.error('Payload that was sent:', payload);
+        console.error('=======================');
+        
+        const errorMessage = error.error || error.message || 'Unknown error';
+        toast.error(`${errorMessage} (${response.status})`);
+      }
+    } catch {
+      toast.error("Network error while saving PRD");
+    } finally {
       setSaving(false);
     }
   };
 
-  const deletePRD = async (id: string) => {
+  const deletePRD = async () => {
+    if (!prdToDelete) return;
+    
+    setSaving(true);
     try {
-      // Simulate deletion
-      setTimeout(() => {
-        setSaved(prev => prev.filter(prd => prd.id !== id));
-        if (editingId === id) startNew();
-        toast.success("PRD deleted");
-      }, 500);
-    } catch (e: any) {
-      toast.error("Error deleting PRD");
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/prd/${prdToDelete}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        setSaved(prev => prev.filter(prd => (prd._id || prd.id) !== prdToDelete));
+        if (editingId === prdToDelete) startNew();
+        toast.success("PRD deleted successfully");
+        setDeleteModalOpen(false);
+        setPrdToDelete(null);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to delete PRD");
+      }
+    } catch {
+      toast.error("Network error while deleting PRD");
+    } finally {
+      setSaving(false);
     }
   };
 
+  const confirmDeletePRD = (prdId: string) => {
+    setPrdToDelete(prdId);
+    setDeleteModalOpen(true);
+  };
+
   const generateReport = async () => {
+    if (!editingId) {
+      toast.error("Please save the PRD first before generating a report");
+      return;
+    }
+    
     setGenerating(true);
     try {
-      // Simulate report generation
-      setTimeout(() => {
-        const mockReport = {
-          productInformation: `## ${productContext.productName}\n\n${productContext.productDescription}\n\nThis document outlines the comprehensive requirements for ${productContext.productName}, targeting ${productContext.targetUsers}.`,
-          goalsAndObjectives: `## Goals & Objectives\n\nPrimary Objective: ${productContext.businessGoal}\n\nKey Goals:\n- Solve ${productContext.problemSolved}\n- Achieve market traction\n- Scale to 1000+ users`,
-          targetUsers: `## Target Users\n\nPrimary Users: ${productContext.targetUsers}\n\nUser Personas:\n- Early adopters looking for innovative solutions\n- Teams struggling with current alternatives\n- Organizations seeking efficiency gains`,
-          problemStatement: `## Problem Statement\n\n${productContext.problemSolved}\n\nCurrent solutions fail to address:\n- Efficiency gaps\n- User experience issues\n- Cost optimization opportunities`,
-          valueProposition: `## Value Proposition\n\n${productDefinition.valueProp}\n\nKey Differentiators:\n- Superior user experience\n- Advanced features\n- Competitive pricing`,
-          assumptions: `## Assumptions\n\n${strategicContext.keyAssumptions}\n\nMarket Assumptions:\n- Growing demand for solutions\n- Willingness to adopt new technology\n- Budget availability in target segment`
-        };
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/prd/${editingId}/generate-report`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setReport(data.data.report);
+        toast.success("PRD generated successfully!");
+        await loadSavedPRDs(); // Refresh to update status
+      } else {
+        const error = await response.json();
+        const errorMessage = error.error || "Failed to generate report";
         
-        setReport(mockReport);
-        toast.success("PRD generated!");
-        setGenerating(false);
-      }, 3000);
-    } catch (e: any) {
-      toast.error("Error generating PRD");
+        if (error.retry_suggested) {
+          toast.error(`${errorMessage}. Please try again in a few minutes.`);
+        } else {
+          toast.error(errorMessage);
+        }
+      }
+    } catch {
+      toast.error("Network error while generating report");
+    } finally {
       setGenerating(false);
     }
   };
 
-  const loadPRD = (p: any) => {
-    setEditingId(p.id); setTitle(p.title); setPrdType(p.prd_type || "simple");
+  const loadPRDFromList = (p: any) => {
+    setEditingId(p._id || p.id);
+    setTitle(p.title);
+    setPrdType(p.prd_type || "simple");
+    
+    // Map backend snake_case to frontend camelCase
     const pc = p.product_context || {};
-    setProductContext({ productName: pc.productName || "", productDescription: pc.productDescription || "", problemSolved: pc.problemSolved || "", targetUsers: pc.targetUsers || "", businessGoal: pc.businessGoal || "" });
+    setProductContext({
+      productName: pc.product_name || "",
+      productDescription: pc.product_description || "",
+      problemSolved: pc.problem_solved || "",
+      targetUsers: pc.target_users || "",
+      businessGoal: pc.business_goal || ""
+    });
+    
     const sc = p.strategic_context || {};
-    setStrategicContext({ marketOpportunity: sc.marketOpportunity || "", keyAssumptions: sc.keyAssumptions || "", constraints: sc.constraints || "", risks: sc.risks || "" });
+    setStrategicContext({
+      marketOpportunity: sc.market_opportunity || "",
+      keyAssumptions: sc.key_assumptions || "",
+      constraints: sc.constraints || "",
+      risks: sc.risks || ""
+    });
+    
     const pd = p.product_definition || {};
-    setProductDefinition({ coreFeatures: pd.coreFeatures || "", userFlows: pd.userFlows || "", valueProp: pd.valueProp || "" });
+    setProductDefinition({
+      coreFeatures: pd.core_features || "",
+      userFlows: pd.user_flows || "",
+      valueProp: pd.value_prop || ""
+    });
+    
     const ec = p.execution_context || {};
-    setExecutionContext({ timeline: ec.timeline || "", teamSize: ec.teamSize || "", technicalComplexity: ec.technicalComplexity || "" });
+    setExecutionContext({
+      timeline: ec.timeline || "",
+      teamSize: ec.team_size || "",
+      technicalComplexity: ec.technical_complexity || ""
+    });
+    
     setReport(p.report && Object.keys(p.report).length > 0 ? p.report : null);
+    setLinkedProjectId(p.project_id);
     setStep(0);
   };
 
   const startNew = () => {
-    setEditingId(null); setTitle("Untitled PRD"); setPrdType("simple");
+    setEditingId(null);
+    setTitle("Untitled PRD");
+    setPrdType("simple");
     setProductContext({ productName: "", productDescription: "", problemSolved: "", targetUsers: "", businessGoal: "" });
     setStrategicContext({ marketOpportunity: "", keyAssumptions: "", constraints: "", risks: "" });
     setProductDefinition({ coreFeatures: "", userFlows: "", valueProp: "" });
     setExecutionContext({ timeline: "", teamSize: "", technicalComplexity: "" });
-    setReport(null); setStep(0);
+    setReport(null);
+    setLinkedProjectId(null);
+    setStep(0);
   };
 
 
@@ -291,14 +451,14 @@ export default function PRDGeneratorPage() {
               {isLoading ? <p className="text-xs text-muted-foreground">Loading...</p> :
                 saved?.length === 0 ? <p className="text-xs text-muted-foreground">No PRDs yet.</p> :
                 saved?.map((p: any) => (
-                  <div key={p.id} className={`relative group w-full text-left p-2 rounded-md border text-sm transition-colors cursor-pointer ${editingId === p.id ? "border-accent bg-accent/10" : "border-border hover:bg-muted/50"}`}
-                    onClick={() => loadPRD(p)}>
+                  <div key={p._id || p.id} className={`relative group w-full text-left p-2 rounded-md border text-sm transition-colors cursor-pointer ${editingId === (p._id || p.id) ? "border-accent bg-accent/10" : "border-border hover:bg-muted/50"}`}
+                    onClick={() => loadPRDFromList(p)}>
                     <div className="font-medium truncate pr-6">{p.title}</div>
                     <div className="flex items-center gap-1 mt-1">
                       <Badge variant={p.status === "complete" ? "default" : "secondary"} className="text-[10px]">{p.status}</Badge>
                       <Badge variant="outline" className="text-[10px]">{p.prd_type}</Badge>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); deletePRD(p.id); }}
+                    <button onClick={(e) => { e.stopPropagation(); confirmDeletePRD(p._id || p.id); }}
                       className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -406,8 +566,8 @@ export default function PRDGeneratorPage() {
                       <DialogHeader><DialogTitle>Link to Project</DialogTitle></DialogHeader>
                       <div className="space-y-2">
                         {projects?.map((p: any) => (
-                          <button key={p.id} className="w-full text-left p-3 rounded-md border hover:bg-muted/50 transition-colors"
-                            onClick={() => { savePRD(p.id); setLinkProjectOpen(false); }}>{p.name}</button>
+                          <button key={p._id} className="w-full text-left p-3 rounded-md border hover:bg-muted/50 transition-colors"
+                            onClick={() => { setLinkedProjectId(p._id); savePRD(p._id); setLinkProjectOpen(false); }}>{p.name}</button>
                         ))}
                         {!projects?.length && <p className="text-sm text-muted-foreground">No projects in this workspace.</p>}
                       </div>
@@ -433,7 +593,7 @@ export default function PRDGeneratorPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {Object.entries(report).filter(([k]) => k !== "raw").map(([key, value]) => (
+                  {Object.entries(report).filter(([k]) => k !== "raw" && k !== "generated_at" && k !== "ai_model" && k !== "model" && k !== "timestamp").map(([key, value]) => (
                     <div key={key} className="border-b border-border pb-4 last:border-0">
                       <h4 className="text-sm font-semibold text-primary mb-2">{SECTION_LABELS[key] || key}</h4>
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">{String(value)}</p>

@@ -3,25 +3,30 @@ import { Link } from "react-router-dom";
 import logoMark from "@/assets/logo-mark.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
-  // const { resetPassword } = useAuth();
+  const { resetPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
     setLoading(true);
-    // const { error } = await resetPassword(email);
+    const { error } = await resetPassword(email);
     setLoading(false);
-    // if (error) {
-    //   toast.error(error.message);
-    // } else {
-    //   setSent(true);
-    // }
+    
+    if (error) {
+      toast.error(error);
+    } else {
+      setSent(true);
+    }
   };
 
   return (

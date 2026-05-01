@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,8 @@ import { BookOpen, ArrowRight, ArrowLeft, Save, Plus, Loader2, Sparkles, Link2, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useProject } from "@/contexts/ProjectContext";
 
 const STEPS = [
   "Product Context", "Module", "Epic", "Story Definition",
@@ -53,128 +56,12 @@ function TagInput({ values, onChange, placeholder }: TagInputProps) {
   );
 }
 
-// Dummy data
-const dummyUser = { id: "user123" };
-const dummyWorkspace = { id: "workspace1", name: "Default Workspace" };
-
-const dummyUserStories = [
-  {
-    id: "story1",
-    title: "User Authentication Story",
-    product_context: {
-      productName: "Product Nerve",
-      productDescription: "AI-powered venture validation platform",
-      targetUser: "Startup founders",
-      businessGoal: "Secure platform access",
-      featureName: "User Authentication",
-      featureDescription: "Login and registration system"
-    },
-    module_definition: {
-      moduleName: "Authentication",
-      moduleDescription: "User identity and access management"
-    },
-    epic_definition: {
-      epicTitle: "User Authentication System",
-      epicDescription: "Complete authentication workflow for platform access",
-      epicObjective: "Enable secure user account access"
-    },
-    story_definition: {
-      userPersona: "Startup founder",
-      userNeed: "Secure account login",
-      userGoal: "Access venture dashboard",
-      businessValue: "Platform security and user trust",
-      featureTrigger: "User clicks login button"
-    },
-    user_flow: {
-      entryPoint: "User lands on login page",
-      userActions: "Enter credentials → Click login → Verify identity",
-      systemResponses: "Validate credentials → Create session → Redirect",
-      exitPoint: "User redirected to dashboard"
-    },
-    preconditions: ["User account exists", "Valid credentials provided"],
-    postconditions: ["User session created", "User authenticated"],
-    dependencies: ["Authentication service", "Database connection"],
-    design_considerations: ["Mobile responsive", "Error handling"],
-    technical_considerations: ["JWT tokens", "Password hashing"],
-    definition_of_done: ["All tests passing", "Security review complete"],
-    report: {
-      stories: [
-        {
-          module: "Authentication",
-          epic: "User Authentication System",
-          storyId: "AUTH-001",
-          title: "User Login",
-          why: "As a startup founder, I want to securely log into my account so that I can access my venture dashboard",
-          story: "As a startup founder, I want to securely log into my account so that I can access my venture dashboard",
-          precondition: "User account exists and valid credentials provided",
-          userFlow: "Navigate to login page → Enter email/password → Click login → System validates → Redirect to dashboard",
-          postCondition: "User session created and user authenticated",
-          acceptanceCriteria: {
-            happy: "User successfully logs in with valid credentials",
-            unhappy: "User sees error message with invalid credentials"
-          },
-          dependencies: "Authentication service, Database connection",
-          designConsideration: "Mobile responsive design with clear error states",
-          technicalConsiderations: "JWT tokens for session management, bcrypt for password hashing",
-          definitionOfDone: "Unit tests passing, Integration tests complete, Security review approved"
-        }
-      ]
-    },
-    status: "complete",
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: "story2",
-    title: "Project Creation Story",
-    product_context: {
-      productName: "Product Nerve",
-      productDescription: "AI-powered venture validation platform",
-      targetUser: "Startup founders",
-      businessGoal: "Enable venture creation",
-      featureName: "Project Management",
-      featureDescription: "Create and manage ventures"
-    },
-    module_definition: {
-      moduleName: "Project Management",
-      moduleDescription: "Venture creation and management"
-    },
-    epic_definition: {
-      epicTitle: "Venture Creation Workflow",
-      epicDescription: "Complete project lifecycle management",
-      epicObjective: "Enable venture creation and tracking"
-    },
-    story_definition: {
-      userPersona: "Startup founder",
-      userNeed: "Create new venture",
-      userGoal: "Start validation process",
-      businessValue: "Platform engagement and retention",
-      featureTrigger: "User clicks create project button"
-    },
-    user_flow: {
-      entryPoint: "User on dashboard",
-      userActions: "Click create project → Fill details → Submit",
-      systemResponses: "Validate input → Create project → Show success",
-      exitPoint: "User redirected to new project"
-    },
-    preconditions: ["User authenticated", "Valid project details"],
-    postconditions: ["Project created", "User is project owner"],
-    dependencies: ["Database", "Validation service"],
-    design_considerations: ["Progress indicators", "Form validation"],
-    technical_considerations: ["Data validation", "Error handling"],
-    definition_of_done: ["Form validation complete", "Project created successfully"],
-    report: null,
-    status: "draft",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-const dummyProjects = [
-  { id: "proj1", name: "AI Project Manager" },
-  { id: "proj2", name: "Customer Analytics Platform" },
-  { id: "proj3", name: "Supply Chain Optimizer" }
-];
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function UserStoryGeneratorPage() {
+  const { storyId } = useParams();
+  const { activeWorkspace } = useWorkspace();
+  const { projects } = useProject();
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState("Untitled User Story");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -182,9 +69,12 @@ export default function UserStoryGeneratorPage() {
   const [linkProjectOpen, setLinkProjectOpen] = useState(false);
   const [report, setReport] = useState<any>(null);
   const [saved, setSaved] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [workspaceProjects, setWorkspaceProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [storyToDelete, setStoryToDelete] = useState<string | null>(null);
 
   // Step data
   const [productContext, setProductContext] = useState({ productName: "", productDescription: "", targetUser: "", businessGoal: "", featureName: "", featureDescription: "" });
@@ -200,148 +90,347 @@ export default function UserStoryGeneratorPage() {
   const [definitionOfDone, setDefinitionOfDone] = useState<string[]>([]);
 
   useEffect(() => {
-    // Simulate loading saved stories and projects
-    setTimeout(() => {
-      setSaved(dummyUserStories);
-      setProjects(dummyProjects);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    if (storyId) {
+      loadUserStory(storyId);
+    } else {
+      loadSavedStories();
+    }
+  }, [storyId, activeWorkspace]);
 
-  const buildPayload = (projectId?: string) => ({
-    user_id: dummyUser.id,
-    workspace_id: dummyWorkspace.id,
-    title,
-    product_context: productContext as any,
-    module_definition: moduleDef as any,
-    epic_definition: epicDef as any,
-    story_definition: storyDef as any,
-    user_flow: userFlow as any,
-    preconditions: preconditions as any,
-    postconditions: postconditions as any,
-    dependencies: dependencies as any,
-    design_considerations: designConsiderations as any,
-    technical_considerations: technicalConsiderations as any,
-    definition_of_done: definitionOfDone as any,
-    report: report || {},
-    status: report ? "complete" : "draft",
-    ...(projectId ? { project_id: projectId } : {}),
-  });
+  const loadSavedStories = async () => {
+    if (!activeWorkspace) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const workspaceId = activeWorkspace._id || activeWorkspace.id;
+
+      if (!workspaceId) {
+        toast.error("No workspace ID found");
+        return;
+      }
+
+      // Debug logging to identify the issue
+      console.log('Loading user stories for workspace:', activeWorkspace);
+      console.log('Workspace ID:', workspaceId);
+      console.log('Workspace ID type:', typeof workspaceId);
+      console.log('Token:', token ? 'Present' : 'Missing');
+
+      const response = await fetch(`${API_BASE_URL}/user-stories?workspace_id=${workspaceId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSaved(data.data.userStories || []);
+      } else {
+        const errorText = await response.text();
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { error: errorText };
+        }
+        console.error('Backend error response:', error);
+        console.error('Response status:', response.status);
+        console.error('Response headers:', response.headers);
+        toast.error(error.error || `Failed to load user stories (${response.status})`);
+      }
+    } catch {
+      toast.error("Network error while loading user stories");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadUserStory = async (id: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/user-stories/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const story = data.data;
+        
+        // Debug logging to see what data is being loaded
+        console.log('=== LOAD USER STORY DATA ===');
+        console.log('Story data:', story);
+        console.log('Product context:', story.product_context);
+        console.log('Module definition:', story.module_definition);
+        console.log('Epic definition:', story.epic_definition);
+        console.log('Story definition:', story.story_definition);
+        console.log('User flow:', story.user_flow);
+        console.log('==============================');
+        
+        setEditingId(story._id || story.id);
+        setTitle(story.title);
+        
+        // Map backend snake_case to frontend camelCase for product_context
+        const pc = story.product_context || {};
+        setProductContext({
+          productName: pc.product_name || "",
+          productDescription: pc.product_description || "",
+          targetUser: pc.target_user || "",
+          businessGoal: pc.business_goal || "",
+          featureName: pc.feature_name || "",
+          featureDescription: pc.feature_description || ""
+        });
+        
+        // Map backend snake_case to frontend camelCase for other fields if needed
+        const md = story.module_definition || {};
+        setModuleDef({
+          moduleName: md.module_name || md.moduleName || "",
+          moduleDescription: md.module_description || md.moduleDescription || ""
+        });
+        
+        const ed = story.epic_definition || {};
+        setEpicDef({
+          epicTitle: ed.epic_title || ed.epicTitle || "",
+          epicDescription: ed.epic_description || ed.epicDescription || "",
+          epicObjective: ed.epic_objective || ed.epicObjective || ""
+        });
+        
+        const sd = story.story_definition || {};
+        setStoryDef({
+          userPersona: sd.user_persona || sd.userPersona || "",
+          userNeed: sd.user_need || sd.userNeed || "",
+          userGoal: sd.user_goal || sd.userGoal || "",
+          businessValue: sd.business_value || sd.businessValue || "",
+          featureTrigger: sd.feature_trigger || sd.featureTrigger || ""
+        });
+        
+        const uf = story.user_flow || {};
+        setUserFlow({
+          entryPoint: uf.entry_point || uf.entryPoint || "",
+          userActions: uf.user_actions || uf.userActions || "",
+          systemResponses: uf.system_responses || uf.systemResponses || "",
+          exitPoint: uf.exit_point || uf.exitPoint || ""
+        });
+        
+        setPreconditions(story.preconditions || []);
+        setPostconditions(story.postconditions || []);
+        setDependencies(story.dependencies || []);
+        setDesignConsiderations(story.design_considerations || []);
+        setTechnicalConsiderations(story.technical_considerations || []);
+        setDefinitionOfDone(story.definition_of_done || []);
+        setReport(story.report || null);
+        setLinkedProjectId(story.project_id);
+        setStep(0);
+        
+        toast.success("User story loaded successfully");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to load user story");
+      }
+    } catch {
+      toast.error("Network error while loading user story");
+    }
+  };
+
+  const buildPayload = (projectId?: string) => {
+    const workspaceId = activeWorkspace?._id || activeWorkspace?.id;
+    
+    if (!workspaceId) {
+      throw new Error("No workspace ID found");
+    }
+
+    // Ensure we only use the string ID, not the full object
+    let finalProjectId = projectId || linkedProjectId;
+    if (finalProjectId && typeof finalProjectId === 'object') {
+      const projectObj = finalProjectId as any;
+      finalProjectId = projectObj._id || projectObj.id;
+    }
+
+    return {
+      title,
+      product_context: {
+        product_name: productContext.productName,
+        product_description: productContext.productDescription,
+        target_user: productContext.targetUser,
+        business_goal: productContext.businessGoal,
+        feature_name: productContext.featureName,
+        feature_description: productContext.featureDescription
+      },
+      module_definition: {
+        module_name: moduleDef.moduleName,
+        module_description: moduleDef.moduleDescription
+      },
+      epic_definition: {
+        epic_title: epicDef.epicTitle,
+        epic_description: epicDef.epicDescription,
+        epic_objective: epicDef.epicObjective
+      },
+      story_definition: {
+        user_persona: storyDef.userPersona,
+        user_need: storyDef.userNeed,
+        user_goal: storyDef.userGoal,
+        business_value: storyDef.businessValue,
+        feature_trigger: storyDef.featureTrigger
+      },
+      user_flow: {
+        entry_point: userFlow.entryPoint,
+        user_actions: userFlow.userActions,
+        system_responses: userFlow.systemResponses,
+        exit_point: userFlow.exitPoint
+      },
+      preconditions,
+      postconditions,
+      dependencies,
+      design_considerations: designConsiderations,
+      technical_considerations: technicalConsiderations,
+      definition_of_done: definitionOfDone,
+      workspace_id: workspaceId,
+      ...(finalProjectId ? { project_id: finalProjectId } : {}),
+    };
+  };
 
   const saveStory = async (projectId?: string) => {
+    if (!activeWorkspace) {
+      toast.error("No active workspace selected");
+      return;
+    }
+
     setSaving(true);
     try {
-      // Simulate saving
-      setTimeout(() => {
-        const newStory = {
-          ...buildPayload(projectId),
-          id: editingId || `story${Date.now()}`,
-          created_at: new Date().toISOString()
-        };
-        
-        if (editingId) {
-          setSaved(prev => prev.map(story => story.id === editingId ? newStory : story));
-        } else {
-          setSaved(prev => [newStory, ...prev]);
-          setEditingId(newStory.id);
+      const token = localStorage.getItem('token');
+      const payload = buildPayload(projectId);
+
+      // Debug logging to identify the issue
+      console.log('Saving user story with payload:', payload);
+      console.log('Payload type:', typeof payload);
+      console.log('Token:', token ? 'Present' : 'Missing');
+      console.log('URL:', editingId ? `${API_BASE_URL}/user-stories/${editingId}` : `${API_BASE_URL}/user-stories`);
+      console.log('Method:', editingId ? 'PUT' : 'POST');
+
+      const url = editingId ? `${API_BASE_URL}/user-stories/${editingId}` : `${API_BASE_URL}/user-stories`;
+      const method = editingId ? 'PUT' : 'POST';
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const savedStory = data.data;
+        if (!editingId) setEditingId(savedStory._id || savedStory.id);
+        if (savedStory.project_id) setLinkedProjectId(savedStory.project_id);
+        toast.success("User story saved successfully");
+        await loadSavedStories();
+      } else {
+        const errorText = await response.text();
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { error: errorText };
         }
+        console.error('=== SAVE USER STORY ERROR ===');
+        console.error('Backend error response:', error);
+        console.error('Raw error text:', errorText);
+        console.error('Response status:', response.status);
+        console.error('Response headers:', response.headers);
+        console.error('Payload that was sent:', payload);
+        console.error('===============================');
         
-        toast.success("User story saved");
-        setSaving(false);
-      }, 1500);
-    } catch (e: any) {
-      toast.error("Error saving user story");
+        // Show detailed error to user
+        const errorMessage = error.error || error.message || 'Unknown error';
+        toast.error(`${errorMessage} (${response.status})`);
+      }
+    } catch {
+      toast.error("Network error while saving user story");
+    } finally {
       setSaving(false);
     }
   };
 
-  const deleteStory = async (id: string) => {
+  const confirmDeleteStory = (storyId: string) => {
+    setStoryToDelete(storyId);
+    setDeleteModalOpen(true);
+  };
+
+  const deleteStory = async () => {
+    if (!storyToDelete) return;
+    
+    setSaving(true);
     try {
-      // Simulate deletion
-      setTimeout(() => {
-        setSaved(prev => prev.filter(story => story.id !== id));
-        if (editingId === id) startNew();
-        toast.success("User story deleted");
-      }, 500);
-    } catch (e: any) {
-      toast.error("Error deleting user story");
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/user-stories/${storyToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        toast.success("User story deleted successfully");
+        // If we're currently editing the deleted story, start a new one
+        if (editingId === storyToDelete) {
+          startNew();
+        }
+        await loadSavedStories();
+        setDeleteModalOpen(false);
+        setStoryToDelete(null);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to delete user story");
+      }
+    } catch {
+      toast.error("Network error while deleting user story");
+    } finally {
+      setSaving(false);
     }
   };
 
   const generateReport = async () => {
+    if (!editingId) {
+      toast.error("Please save the user story first before generating a report");
+      return;
+    }
     setGenerating(true);
     try {
-      // Simulate report generation
-      setTimeout(() => {
-        const mockReport = {
-          summary: `Generated ${Math.floor(Math.random() * 3) + 1} user stories for ${moduleDef.moduleName || "the specified module"}. Each story includes comprehensive acceptance criteria and technical considerations.`,
-          stories: [
-            {
-              module: moduleDef.moduleName || "Authentication",
-              epic: epicDef.epicTitle || "User System",
-              storyId: `STORY-${Math.floor(Math.random() * 1000)}`,
-              title: storyDef.userGoal || "User Goal Achievement",
-              why: `As a ${storyDef.userPersona || "user"}, I want to ${storyDef.userNeed || "accomplish task"} so that I can ${storyDef.userGoal || "achieve objective"}`,
-              story: `As a ${storyDef.userPersona || "user"}, I want to ${storyDef.userNeed || "accomplish task"} so that I can ${storyDef.userGoal || "achieve objective"}`,
-              precondition: preconditions.slice(0, 2).join(", ") || "System is ready",
-              userFlow: userFlow.entryPoint + " → " + userFlow.userActions + " → " + userFlow.systemResponses + " → " + userFlow.exitPoint,
-              postCondition: postconditions.slice(0, 2).join(", ") || "Task completed successfully",
-              acceptanceCriteria: {
-                happy: "User successfully completes the intended action",
-                unhappy: "System handles errors gracefully and provides clear feedback"
-              },
-              dependencies: dependencies.slice(0, 2).join(", ") || "No external dependencies",
-              designConsideration: designConsiderations.slice(0, 2).join(", ") || "Follow design system guidelines",
-              technicalConsiderations: technicalConsiderations.slice(0, 2).join(", ") || "Implement with standard patterns",
-              definitionOfDone: definitionOfDone.slice(0, 2).join(", ") || "Tests pass and code reviewed"
-            }
-          ]
-        };
-        
-        setReport(mockReport);
-        toast.success("User story generated!");
-        setGenerating(false);
-      }, 3000);
-    } catch (e: any) {
-      toast.error("Error generating user story");
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/user-stories/${editingId}/generate-report`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setReport(data.data.report);
+        toast.success("User story report generated successfully!");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to generate report");
+      }
+    } catch {
+      toast.error("Network error while generating report");
+    } finally {
       setGenerating(false);
     }
   };
 
-  const loadStory = (s: any) => {
-    setEditingId(s.id);
-    setTitle(s.title);
-    const pc = s.product_context || {};
-    setProductContext({ productName: pc.productName || "", productDescription: pc.productDescription || "", targetUser: pc.targetUser || "", businessGoal: pc.businessGoal || "", featureName: pc.featureName || "", featureDescription: pc.featureDescription || "" });
-    const md = s.module_definition || {};
-    setModuleDef({ moduleName: md.moduleName || "", moduleDescription: md.moduleDescription || "" });
-    const ed = s.epic_definition || {};
-    setEpicDef({ epicTitle: ed.epicTitle || "", epicDescription: ed.epicDescription || "", epicObjective: ed.epicObjective || "" });
-    const sd = s.story_definition || {};
-    setStoryDef({ userPersona: sd.userPersona || "", userNeed: sd.userNeed || "", userGoal: sd.userGoal || "", businessValue: sd.businessValue || "", featureTrigger: sd.featureTrigger || "" });
-    const uf = s.user_flow || {};
-    setUserFlow({ entryPoint: uf.entryPoint || "", userActions: uf.userActions || "", systemResponses: uf.systemResponses || "", exitPoint: uf.exitPoint || "" });
-    setPreconditions(Array.isArray(s.preconditions) ? s.preconditions : []);
-    setPostconditions(Array.isArray(s.postconditions) ? s.postconditions : []);
-    setDependencies(Array.isArray(s.dependencies) ? s.dependencies : []);
-    setDesignConsiderations(Array.isArray(s.design_considerations) ? s.design_considerations : []);
-    setTechnicalConsiderations(Array.isArray(s.technical_considerations) ? s.technical_considerations : []);
-    setDefinitionOfDone(Array.isArray(s.definition_of_done) ? s.definition_of_done : []);
-    setReport(s.report && Object.keys(s.report).length > 0 ? s.report : null);
-    setStep(0);
-  };
+  const loadStoryFromList = (story: any) => loadUserStory(story._id || story.id);
 
   const startNew = () => {
-    setEditingId(null); setTitle("Untitled User Story");
+    setEditingId(null);
+    setTitle("Untitled User Story");
     setProductContext({ productName: "", productDescription: "", targetUser: "", businessGoal: "", featureName: "", featureDescription: "" });
     setModuleDef({ moduleName: "", moduleDescription: "" });
     setEpicDef({ epicTitle: "", epicDescription: "", epicObjective: "" });
     setStoryDef({ userPersona: "", userNeed: "", userGoal: "", businessValue: "", featureTrigger: "" });
     setUserFlow({ entryPoint: "", userActions: "", systemResponses: "", exitPoint: "" });
-    setPreconditions([]); setPostconditions([]); setDependencies([]);
-    setDesignConsiderations([]); setTechnicalConsiderations([]); setDefinitionOfDone([]);
-    setReport(null); setStep(0);
+    setPreconditions([]);
+    setPostconditions([]);
+    setDependencies([]);
+    setDesignConsiderations([]);
+    setTechnicalConsiderations([]);
+    setDefinitionOfDone([]);
+    setReport(null);
+    setStep(0);
   };
+
 
   const exportCSV = () => {
     if (!report?.stories?.length) return;
@@ -380,14 +469,18 @@ export default function UserStoryGeneratorPage() {
             {isLoading ? <p className="text-xs text-muted-foreground">Loading...</p> :
               saved?.length === 0 ? <p className="text-xs text-muted-foreground">No stories yet.</p> :
               saved?.map((s: any) => (
-                <div key={s.id} className={`relative group w-full text-left p-2 rounded-md border text-sm transition-colors cursor-pointer ${editingId === s.id ? "border-accent bg-accent/10" : "border-border hover:bg-muted/50"}`}
-                  onClick={() => loadStory(s)}>
+                <div key={s._id || s.id} className={`relative group w-full text-left p-2 rounded-md border text-sm transition-colors cursor-pointer ${editingId === (s._id || s.id) ? "border-accent bg-accent/10" : "border-border hover:bg-muted/50"}`}
+                  onClick={() => loadStoryFromList(s)}>
                   <div className="font-medium truncate pr-6">{s.title}</div>
                   <div className="flex items-center gap-1 mt-1">
                     <Badge variant={s.status === "complete" ? "default" : "secondary"} className="text-[10px]">{s.status}</Badge>
-                    <span className="text-[10px] text-muted-foreground">{new Date(s.created_at).toLocaleDateString()}</span>
+                    <span className="text-[10px] text-muted-foreground">{s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    }) : 'No date'}</span>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); deleteStory(s.id); }}
+                  <button onClick={(e) => { e.stopPropagation(); confirmDeleteStory(s._id || s.id); }}
                     className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -537,8 +630,12 @@ export default function UserStoryGeneratorPage() {
                         <DialogHeader><DialogTitle>Link to Project</DialogTitle></DialogHeader>
                         <div className="space-y-2">
                           {projects?.map((p: any) => (
-                            <button key={p.id} className="w-full text-left p-3 rounded-md border hover:bg-muted/50 transition-colors"
-                              onClick={() => { saveStory(p.id); setLinkProjectOpen(false); }}>{p.name}</button>
+                            <button key={p._id || p.id} className="w-full text-left p-3 rounded-md border hover:bg-muted/50 transition-colors"
+                              onClick={() => { 
+                                setLinkedProjectId(p._id || p.id); 
+                                saveStory(p._id || p.id); 
+                                setLinkProjectOpen(false); 
+                              }}>{p.name}</button>
                           ))}
                           {!projects?.length && <p className="text-sm text-muted-foreground">No projects in this workspace.</p>}
                         </div>
@@ -622,6 +719,28 @@ export default function UserStoryGeneratorPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User Story</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete this user story? This action cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={deleteStory} disabled={saving}>
+                {saving ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

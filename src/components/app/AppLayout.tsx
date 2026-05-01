@@ -3,9 +3,8 @@ import AppSidebar from "@/components/app/AppSidebar";
 import WorkspaceSelector from "@/components/app/WorkspaceSelector";
 import NotificationCenter from "@/components/app/NotificationCenter";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-// import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 // import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
-// import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +15,11 @@ import {
 import { User, Building2, CreditCard, Bell, LogOut } from "lucide-react";
 
 export default function AppLayout() {
-  // const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    // await supabase.auth.signOut();
+    await logout();
     navigate("/login");
   };
 
@@ -40,11 +39,10 @@ export default function AppLayout() {
                   <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                     <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center">
                       <span className="text-accent-foreground text-xs font-bold">
-                        {/* {user?.email?.charAt(0).toUpperCase()} */}
-                        JN
+                        {user?.email?.charAt(0).toUpperCase() || 'U'}
                       </span>
                     </div>
-                    <span className="text-sm text-muted-foreground hidden sm:inline">{/* user?.email */} jephthahndukwe@gmail.com</span>
+                    <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">

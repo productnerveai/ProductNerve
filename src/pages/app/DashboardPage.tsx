@@ -2,64 +2,116 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Plus, FolderKanban, TrendingUp, Activity, Building2, CheckCircle2,
+  Plus, FolderKanban, TrendingUp, Activity, Building2, CheckCircle2, FileText, BookOpen, Users,
 } from "lucide-react";
 import BetaFeedbackWidget from "@/components/app/BetaFeedbackWidget";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { toast } from "sonner";
 
-// Dummy data
-const dummyProjects = [
-  {
-    id: "proj1",
-    name: "Mobile App Development",
-    status: "active",
-    overall_score: 85,
-    phase1_status: "complete",
-    phase2_status: "in_progress", 
-    phase3_status: "not_started",
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: "proj2",
-    name: "E-commerce Platform",
-    status: "active",
-    overall_score: 72,
-    phase1_status: "complete",
-    phase2_status: "complete",
-    phase3_status: "in_progress",
-    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: "proj3",
-    name: "AI Assistant Tool",
-    status: "planning",
-    overall_score: null,
-    phase1_status: "in_progress",
-    phase2_status: "not_started",
-    phase3_status: "not_started",
-    updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-const dummyProfile = {
-  name: "John Doe",
-  email: "john.doe@example.com",
-  company_name: "Tech Innovations Inc"
-};
+interface DashboardStats {
+  prd: { draft: number; complete: number; total: number };
+  stories: { draft: number; complete: number; total: number };
+  icp: { draft: number; complete: number; total: number };
+  experiments: { draft: number; complete: number; total: number };
+  growth: { draft: number; complete: number; total: number };
+  roadmaps: { draft: number; complete: number; total: number };
+  overall: { total: number; draft: number; complete: number };
+}
+
+interface RecentArtifact {
+  _id: string;
+  title: string;
+  status: string;
+  type: string;
+  updatedAt: string;
+  project_id?: { _id: string; name: string } | null;
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { activeWorkspace } = useWorkspace();
   const [projects, setProjects] = useState<any[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentArtifacts, setRecentArtifacts] = useState<RecentArtifact[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading data
-    setTimeout(() => {
-      setProjects(dummyProjects);
-      setProfile(dummyProfile);
+    loadDashboardData();
+  }, [activeWorkspace]);
+
+  const loadDashboardData = async () => {
+    if (!activeWorkspace) return;
+    
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const workspaceId = activeWorkspace._id || activeWorkspace.id;
+      
+      // Load all data in parallel
+      const [projectsRes, statsRes, recentRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/projects?workspace_id=${workspaceId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/artifacts/stats?workspace_id=${workspaceId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/artifacts/recent?workspace_id=${workspaceId}&limit=10`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      // Process projects
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        
+        // Handle different response structures
+        let projectsArray = [];
+        if (Array.isArray(projectsData.data)) {
+          projectsArray = projectsData.data;
+        } else if (projectsData.data && projectsData.data.projects) {
+          projectsArray = projectsData.data.projects;
+        } else if (projectsData.data && Array.isArray(projectsData.data)) {
+          projectsArray = projectsData.data;
+        } else {
+          console.log('Projects data structure not recognized, using empty array');
+        }
+        
+        setProjects(projectsArray);
+      } else {
+        console.error('Projects API error:', projectsRes.status, projectsRes.statusText);
+        const errorText = await projectsRes.text();
+        console.error('Error response:', errorText);
+      }
+
+      // Process stats
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData.data);
+      } else {
+        console.error('Stats API error:', statsRes.status, statsRes.statusText);
+      }
+
+      // Process recent artifacts
+      if (recentRes.ok) {
+        const recentData = await recentRes.json();
+        setRecentArtifacts(recentData.data || []);
+      } else {
+        console.error('Recent API error:', recentRes.status, recentRes.statusText);
+      }
+
+      // TODO: Load user profile data
+      setProfile({ name: "User", email: "user@example.com", company_name: "Company" });
+      
+    } catch (error) {
+      console.error('Dashboard loading error:', error);
+      toast.error("Failed to load dashboard data");
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
   if (loading) {
     return (
@@ -69,8 +121,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Empty state: no workspaces
-  if (dummyProjects.length === 0) {
+  // Empty state: no workspace
+  if (!activeWorkspace) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
@@ -86,15 +138,39 @@ export default function DashboardPage() {
   }
 
   // Stats
-  const activeProjects = projects.filter((p) => p.status === "active").length;
-  const scoredProjects = projects.filter((p) => p.overall_score);
+  const projectsArray = Array.isArray(projects) ? projects : [];
+  const activeProjects = projectsArray.filter((p) => p.status === "active").length;
+  const scoredProjects = projectsArray.filter((p) => p.overall_score);
   const avgScore = scoredProjects.length > 0
     ? (scoredProjects.reduce((s: number, p: any) => s + Number(p.overall_score), 0) / scoredProjects.length).toFixed(0)
     : null;
 
+  const totalArtifacts = stats?.overall?.total || 0;
+  const completedArtifacts = stats?.overall?.complete || 0;
+  const draftArtifacts = stats?.overall?.draft || 0;
+
   const profileFields = [profile?.name, profile?.email, profile?.company_name];
   const filledFields = profileFields.filter(Boolean).length;
   const profileCompletion = Math.round((filledFields / profileFields.length) * 100);
+
+  const getArtifactIcon = (type: string) => {
+    switch (type) {
+      case 'prd': return FileText;
+      case 'stories': return BookOpen;
+      case 'icp': return Users;
+      default: return FileText;
+    }
+  };
+
+  const getArtifactPath = (artifact: RecentArtifact) => {
+    const typeMap: Record<string, string> = {
+      'prd': '/app/studio/prd-generator',
+      'stories': '/app/studio/user-stories',
+      'icp': '/app/studio/icp-builder'
+    };
+    const basePath = typeMap[artifact.type] || '/app/studio/artifacts';
+    return `${basePath}/${artifact._id}`;
+  };
 
   return (
     <div>
@@ -112,24 +188,24 @@ export default function DashboardPage() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="glass-card rounded-xl p-5">
           <div className="flex items-center justify-between mb-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-3xl font-bold">1</span>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            <span className="text-3xl font-bold">{totalArtifacts}</span>
           </div>
-          <p className="text-sm text-muted-foreground">Total Workspaces</p>
+          <p className="text-sm text-muted-foreground">Total Artifacts</p>
         </div>
         <div className="glass-card rounded-xl p-5">
           <div className="flex items-center justify-between mb-2">
             <FolderKanban className="h-4 w-4 text-muted-foreground" />
-            <span className="text-3xl font-bold">{projects.length}</span>
+            <span className="text-3xl font-bold">{projectsArray.length}</span>
           </div>
-          <p className="text-sm text-muted-foreground">Projects in Workspace</p>
+          <p className="text-sm text-muted-foreground">Projects</p>
         </div>
         <div className="glass-card rounded-xl p-5">
           <div className="flex items-center justify-between mb-2">
             <CheckCircle2 className="h-4 w-4 text-primary" />
-            <span className="text-3xl font-bold text-primary">{activeProjects}</span>
+            <span className="text-3xl font-bold text-primary">{completedArtifacts}</span>
           </div>
-          <p className="text-sm text-muted-foreground">Active Projects</p>
+          <p className="text-sm text-muted-foreground">Completed</p>
         </div>
         <div className="glass-card rounded-xl p-5">
           <div className="flex items-center justify-between mb-2">
@@ -138,7 +214,7 @@ export default function DashboardPage() {
               {avgScore || "—"}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">Avg Venture Score</p>
+          <p className="text-sm text-muted-foreground">Avg Project Score</p>
         </div>
       </div>
 
@@ -172,38 +248,77 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Projects */}
-      <div className="glass-card rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Recent Projects</h3>
-          {projects.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => navigate("/app/projects")}>View All</Button>
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Recent Projects */}
+        <div className="glass-card rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Recent Projects</h3>
+            {projectsArray.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/app/projects")}>View All</Button>
+            )}
+          </div>
+          {projectsArray.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <FolderKanban className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No projects in this workspace yet.</p>
+              <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => navigate("/app/projects")}>
+                <Plus className="h-4 w-4" /> Create Project
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {projectsArray.slice(0, 3).map((proj) => (
+                <div key={proj._id || proj.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer" onClick={() => navigate(`/app/projects/${proj._id || proj.id}`)}>
+                  <FolderKanban className="h-4 w-4 text-accent" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium block truncate">{proj.name}</span>
+                    {proj.overall_score && (
+                      <span className="text-xs text-muted-foreground">Score: {Number(proj.overall_score).toFixed(0)}</span>
+                    )}
+                  </div>
+                  <span className="ml-auto text-xs text-muted-foreground capitalize">{proj.status}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-        {projects.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <FolderKanban className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No projects in this workspace yet.</p>
-            <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => navigate("/app/projects")}>
-              <Plus className="h-4 w-4" /> Create Project
-            </Button>
+
+        {/* Recent Artifacts */}
+        <div className="glass-card rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Recent Artifacts</h3>
+            {recentArtifacts.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/app/studio/artifacts")}>View All</Button>
+            )}
           </div>
-        ) : (
-          <div className="space-y-2">
-            {projects.slice(0, 5).map((proj) => (
-              <div key={proj.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer" onClick={() => navigate(`/app/projects/${proj.id}`)}>
-                <FolderKanban className="h-4 w-4 text-accent" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium block truncate">{proj.name}</span>
-                  {proj.overall_score && (
-                    <span className="text-xs text-muted-foreground">Score: {Number(proj.overall_score).toFixed(0)}</span>
-                  )}
-                </div>
-                <span className="ml-auto text-xs text-muted-foreground capitalize">{proj.status}</span>
-              </div>
-            ))}
-          </div>
-        )}
+          {recentArtifacts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No artifacts created yet.</p>
+              <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => navigate("/app/studio/artifacts")}>
+                <Plus className="h-4 w-4" /> Create Artifact
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentArtifacts.slice(0, 3).map((artifact) => {
+                const Icon = getArtifactIcon(artifact.type);
+                return (
+                  <div key={artifact._id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer" onClick={() => navigate(getArtifactPath(artifact))}>
+                    <Icon className="h-4 w-4 text-accent" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium block truncate">{artifact.title}</span>
+                      <span className="text-xs text-muted-foreground capitalize">{artifact.type.replace('_', ' ')} • {artifact.status}</span>
+                    </div>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {new Date(artifact.updatedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

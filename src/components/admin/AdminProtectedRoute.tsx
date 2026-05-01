@@ -1,35 +1,13 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useEffect } from "react";
 
 export default function AdminProtectedRoute() {
   const { user, loading } = useAuth();
 
-  const { data: isAdmin, isLoading: adminLoading } = useQuery({
-    queryKey: ["is-platform-admin", user?.id],
-    queryFn: async () => {
-      if (!user) return false;
-      const { data } = await supabase.rpc("is_platform_admin", { _user_id: user.id });
-      return !!data;
-    },
-    enabled: !!user,
-  });
+  // Check admin status from user role
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  useEffect(() => {
-    if (!loading && !adminLoading && user && isAdmin === false) {
-      supabase.from("admin_logs").insert({
-        admin_id: user.id,
-        action: "unauthorized_admin_access_attempt",
-        entity_type: "admin_route",
-        entity_id: window.location.pathname,
-        details: { user_email: user.email, timestamp: new Date().toISOString() },
-      }).then(() => {});
-    }
-  }, [loading, adminLoading, user, isAdmin]);
-
-  if (loading || adminLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">

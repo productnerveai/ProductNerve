@@ -9,50 +9,12 @@ import Phase2Container from "@/components/phase2/Phase2Container";
 import Phase3Container from "@/components/phase3/Phase3Container";
 import MasterVentureDashboard from "@/components/dashboard/MasterVentureDashboard";
 import PaywallModal from "@/components/billing/PaywallModal";
-
-// Dummy project data
-const dummyProjects = {
-  proj1: {
-    id: "proj1",
-    name: "Mobile App Development",
-    status: "active",
-    stage: "validation",
-    overall_score: 85,
-    phase1_status: "complete",
-    phase2_status: "in_progress", 
-    phase3_status: "not_started",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    workspace_id: "ws1"
-  },
-  proj2: {
-    id: "proj2",
-    name: "E-commerce Platform",
-    status: "active",
-    stage: "execution",
-    overall_score: 72,
-    phase1_status: "complete",
-    phase2_status: "complete",
-    phase3_status: "in_progress",
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    workspace_id: "ws1"
-  },
-  proj3: {
-    id: "proj3",
-    name: "AI Assistant Tool",
-    status: "planning",
-    stage: "ideation",
-    overall_score: null,
-    phase1_status: "in_progress",
-    phase2_status: "not_started",
-    phase3_status: "not_started",
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    workspace_id: "ws1"
-  }
-};
+import { useProject } from "@/contexts/ProjectContext";
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
   const [searchParams] = useSearchParams();
+  const { getProject } = useProject();
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("phase1");
@@ -85,10 +47,10 @@ export default function ProjectDetailPage() {
     toast.info("Payments will be activated shortly.");
   };
 
-  const loadProject = () => {
-    // Simulate loading
-    setTimeout(() => {
-      const data = dummyProjects[projectId as keyof typeof dummyProjects];
+  const loadProject = async () => {
+    setLoading(true);
+    try {
+      const data = await getProject(projectId!);
       if (data) {
         setProject(data);
         const p1 = data.phase1_status || "not_started";
@@ -104,10 +66,14 @@ export default function ProjectDetailPage() {
         } else {
           setActiveTab("phase1");
         }
+      } else {
+        toast.error("Project not found");
       }
+    } catch (error) {
+      toast.error("Failed to load project");
+    } finally {
       setLoading(false);
-    }, 1000);
-    return dummyProjects[projectId as keyof typeof dummyProjects];
+    }
   };
 
   const handleExportPDF = () => {

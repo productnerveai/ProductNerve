@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, FileText, BookOpen, Users, ArrowLeft, Download, FlaskConical, TrendingUp, Map } from "lucide-react";
 import { toast } from "sonner";
 import ArtifactModal from "@/components/project/ArtifactModal";
+import { useProject } from "@/contexts/ProjectContext";
 
 function statusBadge(status: string | null) {
   if (!status || status === "not_started") return <Badge variant="outline" className="text-muted-foreground">Not Started</Badge>;
@@ -117,6 +118,7 @@ const dummyArtifacts = {
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams();
+  const { getProject } = useProject();
   const [project, setProject] = useState<any>(null);
   const [scores, setScores] = useState<{ p1: any; p2: any; p3: any }>({ p1: null, p2: null, p3: null });
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>([]);
@@ -130,18 +132,26 @@ export default function ProjectOverviewPage() {
     if (projectId) loadAll();
   }, [projectId]);
 
-  const loadAll = () => {
-    // Simulate loading data
-    setTimeout(() => {
-      const projectData = dummyProjects[projectId as keyof typeof dummyProjects];
-      const scoresData = dummyScores[projectId as keyof typeof dummyScores];
-      const artifactsData = dummyArtifacts[projectId as keyof typeof dummyArtifacts] || [];
-
-      setProject(projectData);
-      setScores(scoresData);
-      setArtifacts(artifactsData);
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const projectData = await getProject(projectId!);
+      if (projectData) {
+        setProject(projectData);
+        // For now, keep dummy scores and artifacts until we have real APIs
+        const scoresData = dummyScores[projectId as keyof typeof dummyScores] || { p1: null, p2: null, p3: null };
+        const artifactsData = dummyArtifacts[projectId as keyof typeof dummyArtifacts] || [];
+        
+        setScores(scoresData);
+        setArtifacts(artifactsData);
+      } else {
+        toast.error("Project not found");
+      }
+    } catch (error) {
+      toast.error("Failed to load project");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleDownloadProject = () => {

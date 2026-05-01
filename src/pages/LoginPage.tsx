@@ -3,12 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import logoMark from "@/assets/logo-mark.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/tracking";
 
 export default function LoginPage() {
-  // const { signIn } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,14 +17,15 @@ export default function LoginPage() {
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // const { error } = await signIn(email, password);
+    const { error } = await signIn(email, password);
     setLoading(false);
-    navigate("/app");
-    // if (error) {
-    //   toast.error(error.message);
-    // } else {
-    //   trackEvent('login', { email });
-    // }
+    
+    if (error) {
+      toast.error(error);
+    } else {
+      trackEvent('login', { email });
+      navigate("/app");
+    }
   };
 
   return (

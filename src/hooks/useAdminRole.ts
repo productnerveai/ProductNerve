@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type AdminRole = "super_admin" | "product_analyst" | "support_specialist" | "growth_analyst";
 
@@ -46,21 +46,29 @@ const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
 };
 
 export function useAdminRole() {
-  const [adminRole, setAdminRole] = useState<AdminRole | null>("super_admin"); // Default to super admin for demo
-  const [isLoading, setIsLoading] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  
+  // Get admin role from user profile, map backend role to frontend role
+  const getAdminRole = (userRole?: string): AdminRole | null => {
+    if (!userRole) return null;
+    
+    // Map backend roles to frontend admin roles
+    switch (userRole) {
+      case "super_admin":
+        return "super_admin";
+      case "product_analyst":
+        return "product_analyst";
+      case "support_specialist":
+        return "support_specialist";
+      case "growth_analyst":
+        return "growth_analyst";
+      default:
+        return null;
+    }
+  };
 
-  useEffect(() => {
-    // Simulate loading admin role
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      // For demo purposes, set as super admin
-      // In a real app, this would check the user's actual role
-      setAdminRole("super_admin");
-      setIsLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
+  const adminRole = getAdminRole(user?.role);
+  const isLoading = authLoading;
 
   const hasAccess = (route: string): boolean => {
     if (!adminRole) return false;

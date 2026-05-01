@@ -3,43 +3,39 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { User, Building2, Trash2, Plus, ShieldCheck, Upload, Bell } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-// ─── Dummy data ────────────────────────────────────────────────────────────────
-
-const DUMMY_USER = {
-  email: "jane.doe@company.com",
-};
-
-const DUMMY_PROFILE = {
-  firstName: "Jane",
-  lastName: "Doe",
-  companyName: "Acme Inc.",
-};
-
-const DUMMY_WORKSPACES = [
-  { id: "ws-1", name: "Marketing Hub", description: "", created_at: "2025-01-05T00:00:00Z" },
-  { id: "ws-2", name: "Product Team", description: "For design & eng collaboration", created_at: "2025-03-12T00:00:00Z" },
-];
-
-// ──────────────────────────────────────────────────────────────────────────────
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const { workspaces, workspacesLoading, setWorkspaces, setActiveWorkspace, refreshWorkspaces } = useWorkspace();
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "profile";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(false);
 
-  // Profile fields
-  const [firstName, setFirstName] = useState(DUMMY_PROFILE.firstName);
-  const [lastName, setLastName] = useState(DUMMY_PROFILE.lastName);
-  const [companyName, setCompanyName] = useState(DUMMY_PROFILE.companyName);
+  // Profile fields - initialize with real user data
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+
+  // Initialize profile fields when user data loads
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.first_name || "");
+      setLastName(user.last_name || "");
+      setCompanyName(user.company_name || "");
+    }
+  }, [user]);
 
   // Notification fields
   const [notifyEmail, setNotifyEmail] = useState(true);
@@ -48,35 +44,62 @@ export default function SettingsPage() {
   const [notifyBilling, setNotifyBilling] = useState(true);
 
   // Password
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
   // Workspaces
-  const [workspaces, setWorkspaces] = useState(DUMMY_WORKSPACES);
   const [showCreate, setShowCreate] = useState(false);
   const [wsName, setWsName] = useState("");
   const [wsDesc, setWsDesc] = useState("");
 
-  // KYC
-  const [kycStatus, setKycStatus] = useState<string>("not_submitted");
-  const [kycForm, setKycForm] = useState({
-    official_company_name: "",
+  // Load workspaces on component mount
+  useEffect(() => {
+    refreshWorkspaces();
+  }, []);
+
+  // Profile Completion
+  const [profileStatus, setProfileStatus] = useState<string>("not_submitted");
+  const [profileForm, setProfileForm] = useState({
+    official_company_name: user?.company_name || "",
     registration_number: "",
     website: "",
     custom_email: "",
     phone: "",
   });
-  const [kycFile, setKycFile] = useState<File | null>(null);
-  const [kycSubmitting, setKycSubmitting] = useState(false);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
 
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSaveProfile = async () => {
     setLoading(true);
-    // TODO: replace with real API call
-    await new Promise((r) => setTimeout(r, 400));
-    setLoading(false);
-    toast.success("Profile updated!");
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/auth/update-profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          company_name: companyName
+        })
+      });
+
+      if (response.ok) {
+        toast.success("Profile updated!");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update profile");
+      }
+    } catch (error) {
+      toast.error("Network error during profile update");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleToggleNotification = (
@@ -92,8 +115,16 @@ export default function SettingsPage() {
   };
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!currentPassword) {
+      toast.error("Please enter your current password");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters long");
+      return;
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      toast.error("New password must contain at least one uppercase letter, one lowercase letter, and one number");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -101,48 +132,113 @@ export default function SettingsPage() {
       return;
     }
     setLoading(true);
-    // TODO: replace with real API call
-    await new Promise((r) => setTimeout(r, 400));
-    setLoading(false);
-    toast.success("Password updated!");
-    setNewPassword("");
-    setConfirmPassword("");
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
+      });
+
+      if (response.ok) {
+        toast.success("Password changed successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update password");
+      }
+    } catch (error) {
+      toast.error("Network error during password update");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createWorkspace = async () => {
     if (!wsName.trim()) return;
-    // TODO: replace with real API call
-    const newWs = {
-      id: `ws-${Date.now()}`,
-      name: wsName.trim(),
-      description: wsDesc.trim(),
-      created_at: new Date().toISOString(),
-    };
-    setWorkspaces((prev) => [...prev, newWs]);
-    setShowCreate(false);
-    setWsName("");
-    setWsDesc("");
-    toast.success("Workspace created!");
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/workspaces`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: wsName.trim(),
+          description: wsDesc.trim()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWorkspaces([data.data, ...workspaces]);
+        setActiveWorkspace(data.data);
+        setShowCreate(false);
+        setWsName("");
+        setWsDesc("");
+        toast.success("Workspace created!");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to create workspace");
+      }
+    } catch (error) {
+      toast.error("Network error while creating workspace");
+    }
   };
 
   const deleteWorkspace = async (wsId: string) => {
-    // TODO: replace with real API call
-    setWorkspaces((prev) => prev.filter((w) => w.id !== wsId));
-    toast.success("Workspace deleted");
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/workspaces/${wsId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const updatedWorkspaces = workspaces.filter((w) => w._id !== wsId && w.id !== wsId);
+        setWorkspaces(updatedWorkspaces);
+        
+        // Set first remaining workspace as active, or null if no workspaces left
+        if (updatedWorkspaces.length > 0) {
+          setActiveWorkspace(updatedWorkspaces[0]);
+        } else {
+          setActiveWorkspace(null);
+        }
+        
+        toast.success("Workspace deleted");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to delete workspace");
+      }
+    } catch (error) {
+      toast.error("Network error while deleting workspace");
+    }
   };
 
-  const handleKYCSubmit = async () => {
-    setKycSubmitting(true);
+  const handleProfileSubmit = async () => {
+    setProfileSubmitting(true);
     // TODO: replace with real API call (file upload + record insert)
     await new Promise((r) => setTimeout(r, 600));
     toast.success("KYC submitted for review!");
-    setKycStatus("pending");
-    setKycSubmitting(false);
+    setProfileStatus("pending");
+    setProfileSubmitting(false);
   };
 
-  // ─── KYC badge ──────────────────────────────────────────────────────────────
+  // ─── Profile Completion badge ──────────────────────────────────────────────────────────────
 
-  const kycStatusBadge = () => {
+  const profileStatusBadge = () => {
     const variants: Record<string, any> = {
       pending: "secondary",
       approved: "default",
@@ -155,8 +251,8 @@ export default function SettingsPage() {
       not_submitted: "Not Submitted",
     };
     return (
-      <Badge variant={variants[kycStatus] || "outline"}>
-        {labels[kycStatus] || kycStatus}
+      <Badge variant={variants[profileStatus] || "outline"}>
+        {labels[profileStatus] || profileStatus}
       </Badge>
     );
   };
@@ -181,7 +277,7 @@ export default function SettingsPage() {
             <Bell className="h-3.5 w-3.5" /> Notifications
           </TabsTrigger>
           <TabsTrigger value="kyc" className="gap-2">
-            <ShieldCheck className="h-3.5 w-3.5" /> KYC Verification
+            <ShieldCheck className="h-3.5 w-3.5" /> Profile Completion
           </TabsTrigger>
         </TabsList>
 
@@ -201,7 +297,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Email</label>
-              <Input value={DUMMY_USER.email} disabled />
+              <Input value={user?.email || ""} disabled />
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Company Name</label>
@@ -218,6 +314,15 @@ export default function SettingsPage() {
 
             <div className="border-t border-border pt-4 mt-4 space-y-4">
               <h3 className="font-semibold">Change Password</h3>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Current Password</label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                />
+              </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">New Password</label>
                 <Input
@@ -253,7 +358,12 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-            {workspaces.length === 0 ? (
+            {workspacesLoading ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p>Loading workspaces...</p>
+              </div>
+            ) : workspaces.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Building2 className="h-10 w-10 mx-auto mb-3 opacity-50" />
                 <p>No workspaces yet.</p>
@@ -262,7 +372,7 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 {workspaces.map((ws) => (
                   <div
-                    key={ws.id}
+                    key={ws._id || ws.id}
                     className="glass-card rounded-xl p-4 flex items-center justify-between"
                   >
                     <div>
@@ -271,14 +381,14 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground">{ws.description}</p>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(ws.created_at).toLocaleDateString()}
+                        {new Date(ws.createdAt || ws.created_at).toLocaleDateString()}
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteWorkspace(ws.id)}
+                      onClick={() => deleteWorkspace(ws._id || ws.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -366,18 +476,18 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
-        {/* ── KYC ── */}
+        {/* ── Complete Profile ── */}
         <TabsContent value="kyc">
           <div className="glass-card rounded-xl p-6 max-w-lg space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">KYC Verification</h3>
-              {kycStatusBadge()}
+              <h3 className="font-semibold">Complete Profile</h3>
+              {profileStatusBadge()}
             </div>
             <p className="text-sm text-muted-foreground">
               Submit your company verification documents for review.
             </p>
 
-            {kycStatus === "approved" ? (
+            {profileStatus === "approved" ? (
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-sm text-primary">
                 ✓ Your company has been verified.
               </div>
@@ -386,32 +496,32 @@ export default function SettingsPage() {
                 <div>
                   <Label>Official Company Name</Label>
                   <Input
-                    value={kycForm.official_company_name}
-                    onChange={(e) => setKycForm((f) => ({ ...f, official_company_name: e.target.value }))}
+                    value={profileForm.official_company_name}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, official_company_name: e.target.value }))}
                     placeholder="Registered company name"
                   />
                 </div>
                 <div>
                   <Label>Registration Number</Label>
                   <Input
-                    value={kycForm.registration_number}
-                    onChange={(e) => setKycForm((f) => ({ ...f, registration_number: e.target.value }))}
+                    value={profileForm.registration_number}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, registration_number: e.target.value }))}
                     placeholder="Company registration number"
                   />
                 </div>
                 <div>
                   <Label>Website</Label>
                   <Input
-                    value={kycForm.website}
-                    onChange={(e) => setKycForm((f) => ({ ...f, website: e.target.value }))}
+                    value={profileForm.website}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, website: e.target.value }))}
                     placeholder="https://example.com"
                   />
                 </div>
                 <div>
                   <Label>Business Email</Label>
                   <Input
-                    value={kycForm.custom_email}
-                    onChange={(e) => setKycForm((f) => ({ ...f, custom_email: e.target.value }))}
+                    value={profileForm.custom_email}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, custom_email: e.target.value }))}
                     placeholder="business@company.com"
                     type="email"
                   />
@@ -419,8 +529,8 @@ export default function SettingsPage() {
                 <div>
                   <Label>Phone</Label>
                   <Input
-                    value={kycForm.phone}
-                    onChange={(e) => setKycForm((f) => ({ ...f, phone: e.target.value }))}
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
                     placeholder="+1234567890"
                   />
                 </div>
@@ -430,25 +540,25 @@ export default function SettingsPage() {
                     <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 hover:bg-muted/50 transition-colors">
                       <Upload className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">
-                        {kycFile?.name || "Upload PDF, JPG, or PNG (max 10MB)"}
+                        {profileFile?.name || "Upload PDF, JPG, or PNG (max 10MB)"}
                       </span>
                       <input
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png,.webp"
                         className="hidden"
-                        onChange={(e) => setKycFile(e.target.files?.[0] || null)}
+                        onChange={(e) => setProfileFile(e.target.files?.[0] || null)}
                       />
                     </label>
                   </div>
                 </div>
                 <Button
-                  onClick={handleKYCSubmit}
-                  disabled={kycSubmitting || kycStatus === "pending"}
+                  onClick={handleProfileSubmit}
+                  disabled={profileSubmitting || profileStatus === "pending"}
                   className="w-full"
                 >
-                  {kycSubmitting
+                  {profileSubmitting
                     ? "Submitting..."
-                    : kycStatus === "pending"
+                    : profileStatus === "pending"
                     ? "Pending Review"
                     : "Submit for Verification"}
                 </Button>

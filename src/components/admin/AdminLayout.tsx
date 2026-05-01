@@ -1,10 +1,8 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AdminSidebar from "./AdminSidebar";
 import { Outlet } from "react-router-dom";
-import { useAdminRole } from "@/hooks/useAdminRole";
 
 export default function AdminLayout() {
-  const { adminRole } = useAdminRole();
 
   return (
     <SidebarProvider>
