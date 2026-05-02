@@ -16,12 +16,13 @@
     "jsx": "react-jsx",
 
     /* Path mapping */
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
 
     /* Fix for TS deprecation */
-   "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "6.0",
 
     /* Linting */
     "noUnusedLocals": true,
