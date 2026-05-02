@@ -39,7 +39,7 @@ export default function SignupPage() {
       const attribution = getAttributionData();
       trackEvent('signup_completed', { email, ...attribution.first_touch });
       toast.success("Check your email to verify your account!");
-      navigate("/login");
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     }
   };
 

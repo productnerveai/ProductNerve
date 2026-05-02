@@ -19,6 +19,11 @@ export default function LoginPage() {
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
+
+    if (error?.includes('Email not verified')) {
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+      return;
+    }
     
     if (error) {
       toast.error(error);
