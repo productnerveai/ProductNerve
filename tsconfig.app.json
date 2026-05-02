@@ -25,7 +25,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* TypeScript 7.0+ compatibility */
+    "ignoreDeprecations": true
   },
   "include": ["src"]
 }
