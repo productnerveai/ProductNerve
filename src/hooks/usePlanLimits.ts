@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface PlanLimits {
@@ -48,22 +47,8 @@ export function usePlanLimits() {
     queryKey: ["user-profile-limits", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select(
-          [
-            "plan_type",
-            "workspace_limit",
-            "project_limit",
-            "subscription_plan",
-            "subscription_status",
-            "max_workspaces",
-            "max_projects_per_workspace",
-          ].join(",")
-        )
-        .eq("id", user.id)
-        .single();
-      return data as any;
+      // TODO: Replace with actual API call
+      return null;
     },
     enabled: !!user,
   });
@@ -72,11 +57,8 @@ export function usePlanLimits() {
     queryKey: ["user-workspace-count", user?.id],
     queryFn: async () => {
       if (!user) return 0;
-      const { count } = await supabase
-        .from("workspaces")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-      return count || 0;
+      // TODO: Replace with actual API call
+      return 0;
     },
     enabled: !!user,
   });
@@ -85,27 +67,8 @@ export function usePlanLimits() {
     queryKey: ["user-project-counts", user?.id],
     queryFn: async () => {
       if (!user) return { total: 0, byWorkspace: {} as Record<string, number> };
-
-      // Get user's workspaces
-      const { data: userWorkspaces } = await supabase
-        .from("workspaces")
-        .select("id")
-        .eq("user_id", user.id);
-
-      if (!userWorkspaces?.length) return { total: 0, byWorkspace: {} };
-
-      const wsIds = userWorkspaces.map((w) => w.id);
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id, workspace_id")
-        .in("workspace_id", wsIds);
-
-      const byWorkspace: Record<string, number> = {};
-      (projects || []).forEach((p) => {
-        byWorkspace[p.workspace_id] = (byWorkspace[p.workspace_id] || 0) + 1;
-      });
-
-      return { total: projects?.length || 0, byWorkspace };
+      // TODO: Replace with actual API call
+      return { total: 0, byWorkspace: {} };
     },
     enabled: !!user,
   });

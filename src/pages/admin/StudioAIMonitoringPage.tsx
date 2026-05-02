@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Cpu, Activity, AlertTriangle, Zap } from "lucide-react";
 import {
@@ -26,12 +25,8 @@ export default function StudioAIMonitoringPage() {
   const { data: aiLogs } = useQuery({
     queryKey: ["admin-ai-logs-all"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("ai_usage_log")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000);
-      return data ?? [];
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 

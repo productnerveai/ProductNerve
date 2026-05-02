@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -17,24 +16,22 @@ export default function AdminSettingsPage() {
   const { data: settings } = useQuery({
     queryKey: ["admin-system-settings"],
     queryFn: async () => {
-      const { data } = await supabase.from("system_settings").select("*");
-      const map: Record<string, any> = {};
-      data?.forEach(s => { map[s.key] = s.value; });
-      return map;
+      // TODO: Replace with actual API call
+      return {
+        maintenance_mode: { enabled: false },
+        feature_toggles: {
+          phase1_enabled: true, phase2_enabled: true, phase3_enabled: true,
+          pdf_export_enabled: true, kyc_required: false,
+        }
+      };
     },
   });
 
   const upsertSetting = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: any; description?: string }) => {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
-      const { data: existing } = await supabase.from("system_settings").select("id").eq("key", key).single();
-      if (existing) {
-        const { error } = await supabase.from("system_settings").update({ value, updated_by: userId }).eq("key", key);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("system_settings").insert({ key, value, description, updated_by: userId });
-        if (error) throw error;
-      }
+      // TODO: Replace with actual authentication and API call
+      const userId = "admin-user";
+      console.log("Would upsert setting:", { key, value, description, userId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-system-settings"] });

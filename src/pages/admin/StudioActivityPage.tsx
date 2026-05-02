@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,29 +30,8 @@ export default function StudioActivityPage() {
   const { data: activities, isLoading } = useQuery({
     queryKey: ["admin-studio-activity"],
     queryFn: async () => {
-      const results: ActivityItem[] = [];
-
-      const tables: { table: string; tool: string }[] = [
-        { table: "icp_profiles", tool: "ICP Builder" },
-        { table: "experiments", tool: "Experiment Engine" },
-        { table: "growth_plans", tool: "Growth Engine" },
-        { table: "roadmaps", tool: "Roadmap Generator" },
-        { table: "user_stories", tool: "User Story Generator" },
-        { table: "prd_documents", tool: "PRD Generator" },
-      ];
-
-      for (const t of tables) {
-        const { data } = await supabase
-          .from(t.table as any)
-          .select("id, user_id, title, created_at, workspace_id")
-          .order("created_at", { ascending: false })
-          .limit(50);
-        data?.forEach((row: any) =>
-          results.push({ ...row, tool: t.tool })
-        );
-      }
-
-      return results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 100);
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 

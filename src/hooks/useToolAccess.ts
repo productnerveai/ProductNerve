@@ -1,6 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 export type ToolName =
   | "prd_generator"
@@ -28,12 +27,8 @@ export function useToolAccess(toolName: ToolName, workspaceId?: string): ToolAcc
     queryKey: ["tool-access-profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select("plan_type, tool_access, subscription_plan, subscription_status")
-        .eq("id", user.id)
-        .single();
-      return data as any;
+      // TODO: Replace with actual API call
+      return null;
     },
     enabled: !!user,
   });
@@ -52,11 +47,8 @@ export function useToolAccess(toolName: ToolName, workspaceId?: string): ToolAcc
     queryKey: ["tool-doc-count", toolName, workspaceId],
     queryFn: async () => {
       if (!workspaceId) return 0;
-      const { count } = await supabase
-        .from(tableMap[toolName] as any)
-        .select("id", { count: "exact", head: true })
-        .eq("workspace_id", workspaceId);
-      return count ?? 0;
+      // TODO: Replace with actual API call
+      return 0;
     },
     enabled: !!workspaceId,
   });

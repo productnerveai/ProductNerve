@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -32,19 +31,15 @@ export default function StudioModerationPage() {
   const { data: items, isLoading } = useQuery({
     queryKey: ["admin-moderation", tool],
     queryFn: async () => {
-      const { data } = await supabase
-        .from(tool as any)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      return (data ?? []) as any[];
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from(tool as any).delete().eq("id", id);
-      if (error) throw error;
+      // TODO: Replace with actual API call
+      console.log("Would delete item:", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-moderation", tool] });

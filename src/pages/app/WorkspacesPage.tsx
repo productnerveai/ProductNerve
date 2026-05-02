@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,16 +35,10 @@ export default function WorkspacesPage() {
   useEffect(() => { loadData(); }, [user]);
 
   const loadData = async () => {
-    const { data: profile } = await supabase.from("profiles").select("company_id").eq("id", user!.id).single();
-    if (profile?.company_id) {
-      setCompanyId(profile.company_id);
-      const [wsRes, membersRes] = await Promise.all([
-        supabase.from("workspaces").select("*").eq("company_id", profile.company_id).order("created_at", { ascending: false }),
-        supabase.from("company_memberships").select("*, profiles(name, email)").eq("company_id", profile.company_id),
-      ]);
-      setWorkspaces(wsRes.data || []);
-      setMembers(membersRes.data || []);
-    }
+    // TODO: Replace with actual API calls
+    console.log("Would load workspace data for user:", user?.id);
+    setWorkspaces([]);
+    setMembers([]);
     setLoading(false);
   };
 
@@ -58,13 +51,9 @@ export default function WorkspacesPage() {
       return;
     }
 
-    const { error } = await supabase.from("workspaces").insert({
-      name: name.trim(),
-      description: description.trim() || null,
-      company_id: companyId,
-      user_id: user!.id,
-    });
-    if (error) { toast.error(error.message); return; }
+    // TODO: Replace with actual API call
+    console.log("Would create workspace:", { name: name.trim(), description: description.trim(), companyId });
+    
     setShowDialog(false);
     setName("");
     setDescription("");
@@ -75,41 +64,8 @@ export default function WorkspacesPage() {
   const inviteMember = async () => {
     if (!inviteEmail.trim() || !companyId) return;
 
-    // Check if user exists by email
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", inviteEmail.trim().toLowerCase())
-      .maybeSingle();
-
-    if (!existingProfile) {
-      toast.error("User not found. They must sign up first.");
-      return;
-    }
-
-    // Check if already a member
-    const { data: existingMembership } = await supabase
-      .from("company_memberships")
-      .select("id")
-      .eq("company_id", companyId)
-      .eq("user_id", existingProfile.id)
-      .maybeSingle();
-
-    if (existingMembership) {
-      toast.error("User is already a team member");
-      return;
-    }
-
-    const { error } = await supabase.from("company_memberships").insert({
-      company_id: companyId,
-      user_id: existingProfile.id,
-      role: inviteRole as any,
-    });
-
-    if (error) { toast.error(error.message); return; }
-
-    // Update their profile with company_id
-    await supabase.from("profiles").update({ company_id: companyId }).eq("id", existingProfile.id);
+    // TODO: Replace with actual API calls
+    console.log("Would invite member:", { email: inviteEmail.trim(), role: inviteRole, companyId });
 
     setShowInviteDialog(false);
     setInviteEmail("");
@@ -123,7 +79,8 @@ export default function WorkspacesPage() {
       toast.error("You can't remove yourself");
       return;
     }
-    await supabase.from("company_memberships").delete().eq("id", membershipId);
+    // TODO: Replace with actual API call
+    console.log("Would remove member:", { membershipId, userId });
     toast.success("Member removed");
     loadData();
   };

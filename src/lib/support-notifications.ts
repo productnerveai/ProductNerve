@@ -1,24 +1,10 @@
-// // import { supabase } from "@/integrations/supabase/client";
-
 /**
  * Notify all platform admins about a new support ticket or feedback submission.
  * Sends email via send-email edge function to each admin.
  */
 async function getAdminEmails(): Promise<string[]> {
-  const { data } = await supabase
-    .from("platform_admins" as any)
-    .select("user_id")
-    .eq("is_active", true);
-
-  if (!data?.length) return [];
-
-  const adminIds = data.map((a: any) => a.user_id);
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("email")
-    .in("id", adminIds);
-
-  return (profiles || []).map((p) => p.email).filter(Boolean) as string[];
+  // TODO: Replace with actual API call
+  return [];
 }
 
 export async function notifyAdminsNewTicket(ticket: {
@@ -34,23 +20,8 @@ export async function notifyAdminsNewTicket(ticket: {
       return;
     }
 
-    // Send to each admin
-    await Promise.allSettled(
-      adminEmails.map((adminEmail) =>
-        supabase.functions.invoke("send-email", {
-          body: {
-            type: "admin_new_ticket",
-            to: adminEmail,
-            metadata: {
-              name: ticket.name,
-              email: ticket.email,
-              inquiry_type: ticket.inquiry_type,
-              message: ticket.message,
-            },
-          },
-        })
-      )
-    );
+    // TODO: Replace with actual email sending
+    console.log("Would send ticket notification to admins:", { ticket, adminEmails });
   } catch (e) {
     console.error("Failed to notify admins about new ticket:", e);
   }
@@ -65,21 +36,8 @@ export async function notifyAdminsNewFeedback(feedback: {
     const adminEmails = await getAdminEmails();
     if (!adminEmails.length) return;
 
-    await Promise.allSettled(
-      adminEmails.map((adminEmail) =>
-        supabase.functions.invoke("send-email", {
-          body: {
-            type: "admin_new_feedback",
-            to: adminEmail,
-            metadata: {
-              feedback_type: feedback.feedback_type,
-              title: feedback.title,
-              description: feedback.description,
-            },
-          },
-        })
-      )
-    );
+    // TODO: Replace with actual email sending
+    console.log("Would send feedback notification to admins:", { feedback, adminEmails });
   } catch (e) {
     console.error("Failed to notify admins about new feedback:", e);
   }
@@ -91,16 +49,8 @@ export async function sendTicketConfirmationToUser(ticket: {
   message: string;
 }) {
   try {
-    await supabase.functions.invoke("send-email", {
-      body: {
-        type: "ticket_confirmation",
-        to: ticket.email,
-        metadata: {
-          name: ticket.name,
-          message: ticket.message,
-        },
-      },
-    });
+    // TODO: Replace with actual email sending
+    console.log("Would send ticket confirmation to user:", ticket);
   } catch (e) {
     console.error("Failed to send ticket confirmation to user:", e);
   }

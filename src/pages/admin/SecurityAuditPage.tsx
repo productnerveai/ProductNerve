@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -14,37 +13,32 @@ export default function SecurityAuditPage() {
   const { data: unauthorizedAttempts = [] } = useQuery({
     queryKey: ["admin-security-unauthorized"],
     queryFn: async () => {
-      const { data } = await supabase.from("admin_logs").select("*")
-        .eq("action", "unauthorized_admin_access_attempt")
-        .order("created_at", { ascending: false }).limit(50);
-      return data || [];
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 
   const { data: adminActions = [] } = useQuery({
     queryKey: ["admin-audit-logs"],
     queryFn: async () => {
-      const { data } = await supabase.from("admin_logs").select("*")
-        .order("created_at", { ascending: false }).limit(200);
-      return data || [];
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 
   const { data: suspendedUsers = [] } = useQuery({
     queryKey: ["admin-suspended-users"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("profiles").select("id, name, email, user_status")
-        .eq("user_status", "suspended");
-      return (data || []) as any[];
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 
   const { data: rejectedKYC = [] } = useQuery({
     queryKey: ["admin-security-kyc-rejected"],
     queryFn: async () => {
-      const { data } = await supabase.from("kyc_records").select("id, official_company_name, status, rejection_reason, created_at")
-        .eq("status", "rejected").order("created_at", { ascending: false }).limit(20);
-      return data || [];
+      // TODO: Replace with actual API call
+      return [];
     },
   });
 

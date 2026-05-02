@@ -1,4 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
 import { initSentry } from "./sentry";
 import { initPostHog } from "./posthog";
 
@@ -9,11 +8,11 @@ export async function initMonitoring() {
   fetched = true;
 
   try {
-    const { data, error } = await supabase.functions.invoke("monitoring-config");
-    if (error || !data) return;
-
-    await initSentry(data.sentry_dsn);
-    initPostHog(data.posthog_api_key, data.posthog_host);
+    // TODO: Replace with actual monitoring configuration
+    console.log("Monitoring initialization placeholder");
+    
+    // await initSentry(data.sentry_dsn);
+    // initPostHog(data.posthog_api_key, data.posthog_host);
   } catch (e) {
     console.warn("Failed to initialize monitoring:", e);
   }

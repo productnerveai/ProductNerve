@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface AccessStatus {
@@ -17,12 +16,8 @@ export function useProjectAccess(projectId: string | undefined) {
     queryKey: ["profile-billing", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select("subscription_plan, subscription_status, subscription_start, subscription_end")
-        .eq("id", user.id)
-        .single();
-      return data;
+      // TODO: Replace with actual API call
+      return null;
     },
     enabled: !!user,
   });
@@ -31,12 +26,8 @@ export function useProjectAccess(projectId: string | undefined) {
     queryKey: ["project-access", projectId],
     queryFn: async () => {
       if (!projectId) return null;
-      const { data } = await supabase
-        .from("projects")
-        .select("project_locked, project_unlocked_at, unlock_type")
-        .eq("id", projectId)
-        .single();
-      return data;
+      // TODO: Replace with actual API call
+      return null;
     },
     enabled: !!projectId,
   });
