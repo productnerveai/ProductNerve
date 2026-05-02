@@ -16,19 +16,18 @@
     "jsx": "react-jsx",
 
     /* Path mapping */
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
+
+    /* Fix for TS deprecation */
+    "ignoreDeprecations": "6.0",
 
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-
-    /* TypeScript 7.0+ compatibility */
-    "ignoreDeprecations": true
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
 }
