@@ -82,7 +82,7 @@ export default function ICPBuilderPage() {
   const [savedICPs, setSavedICPs] = useState<any[]>([]);
   const [loadingICPs, setLoadingICPs] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
+  const [linkedProjectId, setLinkedProjectId] = useState<string | any>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [icpToDelete, setIcpToDelete] = useState<string | null>(null);
 
@@ -256,7 +256,7 @@ export default function ICPBuilderPage() {
         segments: backendSegments,
         workspace_id: workspaceId,
         ...(projectId || linkedProjectId ? {
-          project_id: projectId || (linkedProjectId?._id || linkedProjectId)
+          project_id: projectId || (linkedProjectId && typeof linkedProjectId === 'object' && linkedProjectId._id ? linkedProjectId._id : linkedProjectId)
         } : {})
       };
 

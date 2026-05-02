@@ -17,7 +17,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { workspaces, workspacesLoading, setWorkspaces, setActiveWorkspace, refreshWorkspaces } = useWorkspace();
+  const { workspaces, loading: workspacesLoading, setWorkspaces, setActiveWorkspace, refreshWorkspaces } = useWorkspace();
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "profile";
   const [activeTab, setActiveTab] = useState(initialTab);
