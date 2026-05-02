@@ -5,6 +5,8 @@ import { Send, Bot, User, Loader2, CheckCircle2, Circle, Wrench } from "lucide-r
 import { toast } from "sonner";
 import { saveIntakeProgress, loadIntakeProgress, clearIntakeProgress } from "@/lib/intake-autosave";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -46,7 +48,7 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
     "Thanks for that. How urgent is revenue generation? Are you under pressure to monetize quickly?",
     "Final question - what are your scalability intentions? Are you building for a niche market or planning for rapid expansion?",
     "<INTAKE_COMPLETE>{\"commitment_level\":\"high\",\"capital_range\":\"100k-500k\",\"funding_expected\":true,\"team_capabilities\":[\"engineering\",\"product\"],\"technical_complexity\":\"medium\",\"speed_vs_stability\":\"balanced\",\"validation_objective\":\"product-market-fit\",\"risk_appetite\":\"moderate\",\"operational_capacity\":\"medium\",\"revenue_urgency\":\"medium\",\"scalability_intent\":\"moderate\",\"follow_up_responses\":{\"recommended_execution_mode\":\"balanced\"}}</INTAKE_COMPLETE>"
-  ];
+  ]; 
 
   useEffect(() => {
     const saved = loadIntakeProgress(projectId, "phase2");
@@ -84,44 +86,136 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
   const streamResponse = async (msgs: Message[]) => {
     setIsLoading(true);
     
-    // Simulate AI response based on message count
-    const userMsgCount = msgs.filter(m => m.role === "user").length;
-    const responseIndex = Math.min(userMsgCount - 1, dummyResponses.length - 1);
-    const responseText = dummyResponses[Math.max(0, responseIndex)];
-    
-    // Simulate streaming effect
-    let currentText = "";
-    const words = responseText.split(' ');
-    
-    for (let i = 0; i < words.length; i++) {
-      currentText += (i > 0 ? ' ' : '') + words[i];
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
-        }
-        return [...prev, { role: "assistant", content: currentText }];
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase2-intake`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          // Send the full conversation as structured messages, not just a flattened string
+          messages: msgs.map(m => `${m.role === 'user' ? 'FOUNDER' : 'ADVISOR'}: ${m.content}`).join('\n\n'),
+          project_id: projectId
+        })
       });
-      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-    }
 
-    // Check for intake completion
-    if (currentText.includes("<INTAKE_COMPLETE>")) {
-      const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
-      if (match) {
-        try {
-          const intakeData = JSON.parse(match[1]);
-          setCompletedAreas(10);
-          clearIntakeProgress(projectId, "phase2");
-          toast.success("Execution capacity assessed! Ready for mode selection.");
-          onIntakeComplete(intakeData);
-        } catch (e) {
-          console.error("Failed to parse intake data:", e);
+      if (response.ok) {
+        const data = await response.json();
+        const responseText = data.data?.response;
+        
+        if (!responseText) {
+          console.error('Empty response from AI service');
+          toast.error("Received empty response from AI service");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Simulate streaming effect
+        let currentText = "";
+        const words = responseText.split(' ');
+        
+        for (let i = 0; i < words.length; i++) {
+          currentText += (i > 0 ? ' ' : '') + words[i];
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
+            }
+            return [...prev, { role: "assistant", content: currentText }];
+          });
+          await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+        }
+
+        // Parse area completion signal
+        const areaMatch = currentText.match(/<AREA_COMPLETE:(\d+)>/);
+        if (areaMatch) {
+          const completedArea = parseInt(areaMatch[1]);
+          setCompletedAreas(prev => Math.max(prev, completedArea));
+        }
+
+        // Strip the signal from the displayed message
+        setMessages(prev =>
+          prev.map((m, idx) =>
+            idx === prev.length - 1
+              ? { ...m, content: m.content.replace(/<AREA_COMPLETE:\d+>/g, "").trim() }
+              : m
+          )
+        );
+
+        // Check for intake completion
+        if (currentText.includes("<INTAKE_COMPLETE>")) {
+          const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
+          if (match) {
+            try {
+              const intakeData = JSON.parse(match[1]);
+              setCompletedAreas(10);
+              clearIntakeProgress(projectId, "phase2");
+              toast.success("Execution capacity assessed! Ready for mode selection.");
+              onIntakeComplete(intakeData);
+            } catch (e) {
+              console.error("Failed to parse intake data:", e);
+            }
+          }
+        }
+      } else {
+        const error = await response.json();
+        console.error('AI Service Error:', error);
+        toast.error("AI service temporarily unavailable. Using fallback responses.");
+        
+        // Fallback to dummy response with retry logic
+        const userMsgCount = msgs.filter(m => m.role === "user").length;
+        const responseIndex = Math.min(userMsgCount - 1, dummyResponses.length - 1);
+        const responseText = dummyResponses[Math.max(0, responseIndex)];
+        
+        let currentText = "";
+        const words = responseText.split(' ');
+        
+        for (let i = 0; i < words.length; i++) {
+          currentText += (i > 0 ? ' ' : '') + words[i];
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
+            }
+            return [...prev, { role: "assistant", content: currentText }];
+          });
+          await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+        }
+
+        // Check for intake completion
+        if (currentText.includes("<INTAKE_COMPLETE>")) {
+          const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
+          if (match) {
+            try {
+              const intakeData = JSON.parse(match[1]);
+              setCompletedAreas(10);
+              clearIntakeProgress(projectId, "phase2");
+              toast.success("Execution capacity assessed! Ready for mode selection.");
+              onIntakeComplete(intakeData);
+            } catch (e) {
+              console.error("Failed to parse intake data:", e);
+            }
+          }
         }
       }
+    } catch (error) {
+      console.error('Phase 2 intake error:', error);
+      
+      // Handle network errors specifically
+      if (error.name === 'TypeError' || error.message.includes('split')) {
+        toast.error("Communication error with AI service. Please try again.");
+      } else if (error.message.includes('Failed to fetch')) {
+        toast.error("Network connection error. Please check your connection.");
+      } else if (error.message.includes('listener indicated')) {
+        toast.error("Connection interrupted. Please try again.");
+      } else {
+        toast.error("Network error during intake assessment");
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const sendMessage = async () => {
@@ -200,7 +294,7 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-muted/30 rounded-xl">
+      <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-muted/30 rounded-xl scrollbar-hide">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "assistant" && (
@@ -214,7 +308,10 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
                 : "bg-card border border-border"
             }`}>
               {msg.role === "assistant"
-                ? msg.content.replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "").trim()
+                ? msg.content
+                    .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
+                    .replace(/<AREA_COMPLETE:\d+>/g, "")
+                    .trim()
                 : msg.content}
             </div>
             {msg.role === "user" && (

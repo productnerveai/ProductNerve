@@ -8,36 +8,14 @@ import PhaseFileUpload from "@/components/shared/PhaseFileUpload";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase2ContainerProps {
   projectId: string;
   phase1Status: string;
   onPhaseComplete?: () => void | Promise<void>;
 }
 
-// Dummy phase data
-const dummyPhaseData = {
-  proj1: {
-    phase2_status: "complete",
-    intake_complete: true,
-    execution_mode: "balanced",
-    execution_score: 78,
-    classification: "Good Execution"
-  },
-  proj2: {
-    phase2_status: "scoring",
-    intake_complete: true,
-    execution_mode: "lean",
-    execution_score: null,
-    classification: null
-  },
-  proj3: {
-    phase2_status: "not_started",
-    intake_complete: false,
-    execution_mode: null,
-    execution_score: null,
-    classification: null
-  }
-};
 
 // Helper function to check if phase is complete
 const isPhaseComplete = (status: string) => {
@@ -52,67 +30,98 @@ export default function Phase2Container({ projectId, phase1Status, onPhaseComple
   const [classification, setClassification] = useState<string | null>(null);
   const [rerunsUsed, setRerunsUsed] = useState(0);
   const [isProceeding, setIsProceeding] = useState(false);
-
+  
   useEffect(() => { loadState(); }, [projectId, phase1Status]);
 
-  const loadState = () => {
-    // Simulate loading state
-    setTimeout(() => {
+  const loadState = async () => {
+    try {
       if (!isPhaseComplete(phase1Status)) {
         setPhase("locked");
         return;
       }
 
-      const projectData = dummyPhaseData[projectId as keyof typeof dummyPhaseData];
-      if (!projectData) {
-        setPhase("intake");
-        return;
-      }
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-      const status = projectData.phase2_status || "not_started";
-
-      if (status === "complete" || status === "locked") {
-        setPhaseScore(projectData.execution_score);
-        setClassification(projectData.classification);
-        setExecutionMode(projectData.execution_mode);
-        setPhase("dashboard");
-        return;
-      }
-
-      if (projectData.intake_complete) {
-        // Dummy intake data
-        setIntakeData({
-          commitment_level: "high",
-          capital_range: "100k-500k",
-          funding_expected: true,
-          team_capabilities: ["engineering", "product"],
-          technical_complexity: "medium",
-          speed_vs_stability: "balanced",
-          validation_objective: "product-market-fit",
-          risk_appetite: "moderate",
-          operational_capacity: "medium",
-          revenue_urgency: "medium",
-          scalability_intent: "moderate",
-          follow_up_responses: { recommended_execution_mode: "balanced" }
+      if (response.ok) {
+        const data = await response.json();
+        const projectData = data.data;
+        
+        const status = projectData.phase2_status || "not_started";
+        
+        console.log('Phase 2 state on load:', {
+          status,
+          intake_complete: projectData.intake_complete,
+          execution_mode: projectData.execution_mode,
+          execution_score: projectData.execution_score
         });
 
-        setExecutionMode(projectData.execution_mode);
-
-        if (projectData.execution_score) {
+        if (status === "complete" || status === "locked") {
           setPhaseScore(projectData.execution_score);
-          setClassification(projectData.classification);
+          setClassification(projectData.execution_classification);
+          setExecutionMode(projectData.execution_mode);
           setPhase("dashboard");
+          return;
+        }
+
+        if (projectData.intake_complete) {
+          setIntakeData(projectData.intake_data);
+          
+          // If execution mode is set, use it; otherwise go to mode selection
+          if (projectData.execution_mode) {
+            setExecutionMode(projectData.execution_mode);
+            
+            if (projectData.execution_score) {
+              setPhaseScore(projectData.execution_score);
+              setClassification(projectData.execution_classification);
+              setPhase("dashboard");
+            } else {
+              setPhase("scoring");
+            }
+          } else {
+            // Intake complete but no execution mode selected yet
+            setPhase("mode_select");
+          }
         } else {
-          setPhase("scoring");
+          setPhase("intake");
         }
       } else {
         setPhase("intake");
       }
-    }, 1000);
+    } catch (error) {
+      console.error('Failed to load Phase 2 state:', error);
+      setPhase("intake");
+    }
   };
 
-  const handleIntakeComplete = (data: any) => {
+  const handleIntakeComplete = async (data: any) => {
     setIntakeData(data);
+    
+    // Save intake data to backend
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          intake_data: data
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to save intake data');
+      }
+    } catch (error) {
+      console.error('Error saving intake data:', error);
+    }
+    
     setPhase("upload");
   };
 
@@ -125,33 +134,42 @@ export default function Phase2Container({ projectId, phase1Status, onPhaseComple
     setPhase("scoring");
   };
 
-  const handleScoringComplete = () => {
-    // Simulate scoring completion with dummy data
-    setTimeout(() => {
-      const dummyScore = Math.floor(Math.random() * 30) + 70; // Random score between 70-100
-      const dummyClassifications = ["Good Execution", "Solid Execution", "Early Stage"];
-      const dummyClassification = dummyClassifications[Math.floor(Math.random() * dummyClassifications.length)];
-      
-      setPhaseScore(dummyScore);
-      setClassification(dummyClassification);
-      setPhase("transition");
-    }, 2000);
+  const handleScoringComplete = (scoreData: any) => {
+    setPhaseScore(scoreData.execution_score);
+    setClassification(scoreData.execution_classification);
+    setPhase("transition");
   };
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (isProceeding) return;
     setIsProceeding(true);
 
-    // Simulate phase locking
-    setTimeout(() => {
-      toast.success("Phase 2 locked. Transitioning to Phase 3...");
-      if (onPhaseComplete) {
-        onPhaseComplete();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}/lock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success("Phase 2 locked. Transitioning to Phase 3...");
+        if (onPhaseComplete) {
+          onPhaseComplete();
+        } else {
+          setPhase("dashboard");
+        }
       } else {
-        setPhase("dashboard");
+        const error = await response.json();
+        toast.error(error.error || "Failed to lock Phase 2");
       }
+    } catch (error) {
+      console.error('Phase 2 lock error:', error);
+      toast.error("Network error while locking Phase 2");
+    } finally {
       setIsProceeding(false);
-    }, 2000);
+    }
   };
 
   const handleRerun = () => {

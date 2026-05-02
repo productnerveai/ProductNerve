@@ -42,6 +42,25 @@ export default function DashboardPage() {
     loadDashboardData();
   }, [activeWorkspace]);
 
+  const loadProfileCompletionData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/auth/profile-completion`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load profile completion data:', error);
+    }
+  };
+
   const loadDashboardData = async () => {
     if (!activeWorkspace) return;
     
@@ -79,6 +98,7 @@ export default function DashboardPage() {
           console.log('Projects data structure not recognized, using empty array');
         }
         
+        console.log('Final projects array:', projectsArray);
         setProjects(projectsArray);
       } else {
         console.error('Projects API error:', projectsRes.status, projectsRes.statusText);
@@ -102,8 +122,8 @@ export default function DashboardPage() {
         console.error('Recent API error:', recentRes.status, recentRes.statusText);
       }
 
-      // TODO: Load user profile data
-      setProfile({ name: "User", email: "user@example.com", company_name: "Company" });
+      // Load user profile completion data
+      await loadProfileCompletionData();
       
     } catch (error) {
       console.error('Dashboard loading error:', error);
@@ -149,9 +169,48 @@ export default function DashboardPage() {
   const completedArtifacts = stats?.overall?.complete || 0;
   const draftArtifacts = stats?.overall?.draft || 0;
 
-  const profileFields = [profile?.name, profile?.email, profile?.company_name];
-  const filledFields = profileFields.filter(Boolean).length;
-  const profileCompletion = Math.round((filledFields / profileFields.length) * 100);
+  // Calculate profile completion based on actual profile completion status
+  const getProfileCompletionStatus = () => {
+    if (!profile) return 0;
+    
+    // Basic fields from signup (always filled during registration)
+    const basicFields = [
+      profile.first_name,
+      profile.last_name,
+      profile.email
+    ];
+    
+    // Additional profile completion fields
+    const profileFields = [
+      profile.official_company_name,
+      profile.registration_number,
+      profile.website,
+      profile.custom_email,
+      profile.phone
+    ];
+    
+    // Count filled basic fields (should be 3 from signup)
+    const filledBasicFields = basicFields.filter(field => field && field.trim() !== '').length;
+    
+    // Count filled profile fields
+    const filledProfileFields = profileFields.filter(field => field && field.trim() !== '').length;
+    
+    // Calculate completion: 40% from basic fields + 60% from profile fields
+    const basicCompletion = (filledBasicFields / 3) * 40; // 40% weight for basic fields
+    const profileCompletion = (filledProfileFields / 5) * 60; // 60% weight for profile fields
+    const baseCompletion = Math.round(basicCompletion + profileCompletion);
+    
+    const status = profile.profile_completion_status;
+    
+    if (status === 'approved') return 100;
+    if (status === 'pending') return Math.min(baseCompletion + 15, 95); // Add 15% but cap at 95%
+    if (status === 'rejected') return baseCompletion; // Back to base completion
+    
+    // For not_submitted, show actual completion percentage
+    return baseCompletion;
+  };
+
+  const profileCompletion = getProfileCompletionStatus();
 
   const getArtifactIcon = (type: string) => {
     switch (type) {
@@ -229,7 +288,14 @@ export default function DashboardPage() {
             </div>
           </div>
           {profileCompletion < 100 && (
-            <p className="text-xs text-muted-foreground mt-1">Complete your profile in Settings</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {profile?.profile_completion_status === 'pending' 
+                ? 'Profile under review' 
+                : profile?.profile_completion_status === 'rejected'
+                ? 'Profile needs updates'
+                : 'Complete your profile in Settings'
+              }
+            </p>
           )}
         </div>
         <div className="glass-card rounded-xl p-5">

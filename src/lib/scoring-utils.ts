@@ -12,11 +12,11 @@ export async function safeScoringFetch(
   body: Record<string, unknown>
 ): Promise<{ ok: boolean; data: any; error: string | null }> {
   try {
-    const resp = await fetch(url, {
+    const resp = await fetch(`${import.meta.env.VITE_API_URL}${url}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
       body: JSON.stringify(body),
     });

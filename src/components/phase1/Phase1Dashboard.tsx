@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { ScoreTooltip, getLayerTooltip } from "@/components/ui/score-tooltip";
 import { Button } from "../ui/button";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase1DashboardProps {
   projectId: string;
   onRerun: () => void;
@@ -55,48 +57,6 @@ const getBarColor = (score: number) => {
   return "hsl(var(--destructive))";
 };
 
-// Dummy scores data
-const dummyScores = {
-  proj1: {
-    viability_score: 85,
-    classification: "Strategic Opportunity",
-    action_directive: "Build Now",
-    validation_risk_level: "Low",
-    action_summary: "Strong venture opportunity with clear market need and viable business model.",
-    market_score: 88,
-    problem_score: 82,
-    solution_score: 85,
-    business_score: 84,
-    team_score: 86
-  }
-};
-
-// Dummy routes data
-const dummyRoutes = {
-  proj1: [
-    {
-      id: "route1",
-      title: "Direct to SMB Teams",
-      description: "Target small to medium businesses directly through product-led growth",
-      confidence: "High",
-      effort: "Medium",
-      timeline: "6-12 months",
-      resources: ["Marketing team", "Sales automation", "Content creation"],
-      is_original: true,
-      recommended: true
-    },
-    {
-      id: "route2", 
-      title: "Enterprise Sales",
-      description: "Focus on large enterprise customers with dedicated sales team",
-      confidence: "Medium",
-      effort: "High",
-      timeline: "12-18 months",
-      resources: ["Enterprise sales team", "Custom development", "Compliance"],
-      is_original: false
-    }
-  ]
-};
 
 export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: Phase1DashboardProps) {
   const [scores, setScores] = useState<any>(null);
@@ -109,17 +69,50 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
 
   const loadData = async () => {
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const scoresData = dummyScores[projectId as keyof typeof dummyScores];
-      const routesData = dummyRoutes[projectId as keyof typeof dummyRoutes] || [];
-      setScores(scoresData);
-      setRoutes(routesData);
-      const recommended = routesData.find((r: any) => r.recommended);
-      const orig = routesData.find((r: any) => r.is_original);
-      setSelectedRoute(recommended?.id || orig?.id || null);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase1/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const projectData = data.data;
+        
+        // Set scores data
+        setScores({
+          viability_score: projectData.phase1_score,
+          classification: projectData.phase1_classification,
+          phase1_analysis: projectData.phase1_analysis
+        });
+
+        // Set alternative routes from AI analysis
+        const routes = projectData.phase1_analysis?.alternative_routes?.map((route: any, index: number) => ({
+          id: `route${index}`,
+          title: route.route,
+          description: route.description,
+          is_original: index === 0,
+          recommended: index === 0
+        })) || [];
+
+        setRoutes(routes);
+        const recommended = routes.find((r: any) => r.recommended);
+        const orig = routes.find((r: any) => r.is_original);
+        setSelectedRoute(recommended?.id || orig?.id || null);
+      } else {
+        // If API fails, show no data
+        setScores(null);
+        setRoutes([]);
+      }
+    } catch (error) {
+      console.error('Failed to load Phase 1 dashboard data:', error);
+      setScores(null);
+      setRoutes([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleLock = async () => {
@@ -128,18 +121,32 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
   };
 
   const confirmLock = async () => {
-    // Simulate phase locking
-    setTimeout(() => {
-      setShowLockModal(false);
-      toast.success("Phase 1 locked. Navigating to Phase 2...");
-      onLockProceed?.();
-    }, 1000);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase1/${projectId}/lock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setShowLockModal(false);
+        toast.success("Phase 1 locked. Navigating to Phase 2...");
+        onLockProceed?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to lock Phase 1");
+      }
+    } catch (error) {
+      toast.error("Network error while locking Phase 1");
+    }
   };
 
   if (loading) return <div className="flex justify-center py-16"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
   if (!scores) return <div className="text-center py-16 text-muted-foreground">No scoring data yet.</div>;
 
-  const report = (scores.validation_report as any) || {};
+  const report = (scores.phase1_analysis as any) || {};
   const exec = report.executive_summary || {};
   const problem = report.problem_intensity || {};
   const market = report.market_opportunity || {};
@@ -147,20 +154,39 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
   const competitive = report.competitive_positioning || {};
   const founder = report.founder_advantage || {};
   const assumptionMap = report.assumption_map || {};
-  const riskClusters = report.risk_clusters || {};
+  const riskClusters = report.risk_clusters || report.risk_flags || [];
   const validationGaps = report.validation_gaps || [];
   const buildReadiness = report.build_readiness || {};
   const confidenceBreakdown = report.confidence_breakdown || {};
   const validationMaturity = report.validation_maturity || "Early";
-  const reasoning = report.reasoning || {};
+  const reasoning = report.ai_reasoning_trace || report.reasoning || {};
   const scoringDecisions = report.scoring_decisions || {};
-
+  const strategicRoutes = report.strategic_routes || {};
+  
+  const analysis = scores.phase1_analysis || {};
+  const scoringLayers = analysis.scoring_layers || {};
+  
+  // Use confidence index from executive_summary
+  const confidenceIndex = exec.confidence_index || 
+    Math.round(((scoringLayers.problem_validation?.score || 0) + 
+                 (scoringLayers.solution_fit?.score || 0) + 
+                 (scoringLayers.market_opportunity?.score || 0) + 
+                 (scoringLayers.founder_market_fit?.score || 0) + 
+                 (scoringLayers.business_model?.score || 0)) / 5);
+  
+  // Calculate dynamic weights based on actual AI scores
+  const totalScore = (problem.score || scoringLayers.problem_validation?.score || 0) + 
+                     (competitive.score || scoringLayers.solution_fit?.score || 0) + 
+                     (market.score || scoringLayers.market_opportunity?.score || 0) + 
+                     (founder.score || scoringLayers.founder_market_fit?.score || 0) + 
+                     (buyer.score || scoringLayers.business_model?.score || 0);
+  
   const layerData = [
-    { layer: "Reality Pressure", key: "Reality", score: Number(scores.reality_score), weight: "30%" },
-    { layer: "Market Physics", key: "Market", score: Number(scores.market_score), weight: "25%" },
-    { layer: "Buyer Economics", key: "Buyer", score: Number(scores.buyer_score), weight: "20%" },
-    { layer: "Competitive Gravity", key: "Competitive", score: Number(scores.competitive_score), weight: "15%" },
-    { layer: "Founder Leverage", key: "Founder", score: Number(scores.founder_score), weight: "10%" },
+    { layer: "Problem Validation", key: "Problem", score: problem.score || scoringLayers.problem_validation?.score || 0, weight: totalScore > 0 ? Math.round(((problem.score || scoringLayers.problem_validation?.score || 0) / totalScore) * 100) + "%" : "30%" },
+    { layer: "Solution Fit", key: "Solution", score: competitive.score || scoringLayers.solution_fit?.score || 0, weight: totalScore > 0 ? Math.round(((competitive.score || scoringLayers.solution_fit?.score || 0) / totalScore) * 100) + "%" : "25%" },
+    { layer: "Market Opportunity", key: "Market", score: market.score || scoringLayers.market_opportunity?.score || 0, weight: totalScore > 0 ? Math.round(((market.score || scoringLayers.market_opportunity?.score || 0) / totalScore) * 100) + "%" : "20%" },
+    { layer: "Founder-Market Fit", key: "Founder", score: founder.score || scoringLayers.founder_market_fit?.score || 0, weight: totalScore > 0 ? Math.round(((founder.score || scoringLayers.founder_market_fit?.score || 0) / totalScore) * 100) + "%" : "15%" },
+    { layer: "Business Model", key: "Business", score: buyer.score || scoringLayers.business_model?.score || 0, weight: totalScore > 0 ? Math.round(((buyer.score || scoringLayers.business_model?.score || 0) / totalScore) * 100) + "%" : "10%" },
   ];
 
   const maturityColor = (m: string) => {
@@ -216,7 +242,7 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
               <p className="text-xs mt-1 opacity-70">Classification</p>
             </div>
             <div className="rounded-xl bg-accent/5 border border-accent/20 p-4 text-center">
-              <p className="text-xl font-bold text-accent">{Number(scores.confidence_index).toFixed(0)}%</p>
+              <p className="text-xl font-bold text-accent">{Number(confidenceIndex).toFixed(0)}%</p>
               <p className="text-xs text-muted-foreground mt-1">Confidence Index</p>
             </div>
             <div className="rounded-xl p-4 text-center border">
@@ -345,18 +371,18 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
         <CardContent className="space-y-4">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="rounded-lg border p-3 text-center">
-              <p className="text-2xl font-bold text-primary">{problem.problem_intensity_score || Number(scores.reality_score).toFixed(0)}</p>
+              <p className="text-2xl font-bold text-primary">{problem.score || "N/A"}</p>
               <p className="text-xs text-muted-foreground">Problem Intensity</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(problem.spending_evidence_indicator)}`}>
-                {problem.spending_evidence_indicator || "N/A"}
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(problem.spending_evidence)}`}>
+                {problem.spending_evidence || "N/A"}
               </span>
               <p className="text-xs text-muted-foreground mt-1">Spending Evidence</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(problem.coping_cost_estimate)}`}>
-                {problem.coping_cost_estimate || "N/A"}
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(problem.coping_cost)}`}>
+                {problem.coping_cost || "N/A"}
               </span>
               <p className="text-xs text-muted-foreground mt-1">Coping Cost</p>
             </div>
@@ -391,7 +417,7 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Target Segment</span></div>
-              <p className="text-sm font-medium">{market.target_segment || "Not analyzed"}</p>
+              <p className="text-sm font-medium">{market.segment_definition || "Not analyzed"}</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg border p-2 text-center">
@@ -399,11 +425,11 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
                 <p className="text-[10px] text-muted-foreground mt-1">Market Size</p>
               </div>
               <div className="rounded-lg border p-2 text-center">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColor(market.purchasing_power_reality)}`}>{market.purchasing_power_reality || "N/A"}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColor(market.purchasing_power)}`}>{market.purchasing_power || "N/A"}</span>
                 <p className="text-[10px] text-muted-foreground mt-1">Purchasing Power</p>
               </div>
               <div className="rounded-lg border p-2 text-center">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColor(market.infrastructure_readiness)}`}>{market.infrastructure_readiness || "N/A"}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColor(market.infrastructure_ready ? 'Ready' : 'Not Ready')}`}>{market.infrastructure_ready ? 'Ready' : 'Not Ready'}</span>
                 <p className="text-[10px] text-muted-foreground mt-1">Infrastructure</p>
               </div>
               <div className="rounded-lg border p-2 text-center">
@@ -453,7 +479,7 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
               <p className="text-xs text-muted-foreground mt-1">Unit Economics Tier</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(buyer.capital_intensity_level)}`}>{buyer.capital_intensity_level || "N/A"}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(buyer.capital_intensity)}`}>{buyer.capital_intensity || "N/A"}</span>
               <p className="text-xs text-muted-foreground mt-1">Capital Intensity</p>
             </div>
           </div>
@@ -494,11 +520,11 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
               <p className="text-xs text-muted-foreground mt-1">Differentiation</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(competitive.switching_friction_level)}`}>{competitive.switching_friction_level || "N/A"}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(competitive.switching_friction)}`}>{competitive.switching_friction || "N/A"}</span>
               <p className="text-xs text-muted-foreground mt-1">Switching Friction</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(competitive.platform_dependency_risk)}`}>{competitive.platform_dependency_risk || "N/A"}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(competitive.platform_dependency)}`}>{competitive.platform_dependency || "N/A"}</span>
               <p className="text-xs text-muted-foreground mt-1">Platform Dependency</p>
             </div>
           </div>
@@ -636,38 +662,16 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h5 className="font-medium text-sm">{route.route_label}</h5>
+                        <h5 className="font-medium text-sm">{route.title}</h5>
                         {isRecommended && (
                           <Badge className="bg-accent/10 text-accent text-[10px] gap-1">
                             <Star className="h-3 w-3" /> Recommended
                           </Badge>
                         )}
                       </div>
-                      <span className={`text-lg font-bold ${Number(route.adjusted_score) >= 60 ? "text-primary" : "text-accent"}`}>
-                        {Number(route.adjusted_score).toFixed(0)}
-                      </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">{route.route_description}</p>
-                    {isRecommended && route.recommendation_reason && (
-                      <p className="text-xs text-accent mb-2 italic">"{route.recommendation_reason}"</p>
-                    )}
+                    <p className="text-xs text-muted-foreground mb-2">{route.description}</p>
                     {isSelected && <CheckCircle2 className="h-4 w-4 text-accent mb-2" />}
-                    {Array.isArray(route.trade_offs) && route.trade_offs.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium mb-1">Trade-offs:</p>
-                        <ul className="text-xs text-muted-foreground space-y-0.5">
-                          {route.trade_offs.map((t: string, i: number) => <li key={i}>• {t}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {Array.isArray(route.risk_changes) && route.risk_changes.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium mb-1">Risk Changes:</p>
-                        <ul className="text-xs text-muted-foreground space-y-0.5">
-                          {route.risk_changes.map((r: string, i: number) => <li key={i}>• {r}</li>)}
-                        </ul>
-                      </div>
-                    )}
                   </button>
                 );
               })}
@@ -756,6 +760,60 @@ export default function Phase1Dashboard({ projectId, onRerun, onLockProceed }: P
           )}
         </CardContent>
       </Card>
+
+      {/* ========== STRATEGIC ROUTES ========== */}
+      {strategicRoutes.recommended_route && (
+        <Card className="border border-purple-200/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Rocket className="h-4 w-4 text-purple-600" />
+              Strategic Routes & Decision Path
+              <span className="text-xs text-muted-foreground font-normal">(Recommended path with alternatives)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Recommended Route */}
+            <div className="rounded-lg bg-purple-50 border border-purple-200 p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                  <Star className="h-3 w-3" />
+                </div>
+                <div className="flex-1">
+                  <h6 className="font-semibold text-purple-900 mb-1">Recommended Route</h6>
+                  <p className="font-medium text-purple-800 mb-2">{strategicRoutes.recommended_route.route}</p>
+                  <p className="text-sm text-purple-700 mb-3">{strategicRoutes.recommended_route.description}</p>
+                  {strategicRoutes.recommended_route.why_improves && (
+                    <div className="bg-purple-100 rounded p-2">
+                      <p className="text-xs font-semibold text-purple-800 mb-1">Why This Improves:</p>
+                      <p className="text-xs text-purple-700">{strategicRoutes.recommended_route.why_improves}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Alternative Routes */}
+            {strategicRoutes.alternative_routes?.length > 0 && (
+              <div className="space-y-3">
+                <h6 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Alternative Routes</h6>
+                {strategicRoutes.alternative_routes.map((route: any, index: number) => (
+                  <div key={index} className="rounded-lg border border-gray-200 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center shrink-0 mt-0.5 text-xs font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-800 mb-1">{route.route}</p>
+                        <p className="text-sm text-gray-600">{route.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ========== ACTIONS ========== */}
       <div className="flex flex-wrap gap-3 justify-center pt-4">

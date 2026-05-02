@@ -7,7 +7,7 @@ import ScoringProgressUI from "@/components/shared/ScoringProgressUI";
 interface ScoringEngineProps {
   projectId: string;
   intakeData: any;
-  onScoringComplete: () => void;
+  onScoringComplete: (scoreData: any) => void;
 }
 
 export default function ScoringEngine({ projectId, intakeData, onScoringComplete }: ScoringEngineProps) {
@@ -39,7 +39,7 @@ export default function ScoringEngine({ projectId, intakeData, onScoringComplete
 
     try {
       const result = await safeScoringFetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/phase1-score`,
+        `/validation/phase1-score`,
         { intake_data: intakeData, project_id: projectId }
       );
 
@@ -49,7 +49,7 @@ export default function ScoringEngine({ projectId, intakeData, onScoringComplete
 
       setIsComplete(true);
       toast.success("Venture scored successfully!");
-      onScoringComplete();
+      onScoringComplete(result.data);
     } catch (e: any) {
       if (retryCount < 1) {
         console.warn("Phase 1 scoring retry:", e.message);

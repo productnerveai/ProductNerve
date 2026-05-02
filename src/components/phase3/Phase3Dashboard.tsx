@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-// import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +7,12 @@ import {
   RotateCcw, Lock, ArrowRight, AlertTriangle, CheckCircle2, XCircle,
   TrendingUp, Target, Megaphone, DollarSign, Eye, Shield, HelpCircle,
   Briefcase, Zap, ArrowRightLeft, BarChart3, Brain, Rocket, Activity,
-  Clock, Beaker, Building2,
+  Clock, Beaker, Building2, Search, Share2, Tag, Users, RefreshCw, Swords, Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ScoreTooltip, getLayerTooltip } from "@/components/ui/score-tooltip";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 interface Phase3DashboardProps {
   projectId: string;
@@ -35,6 +36,7 @@ const tierColor = (t: string) => {
   return "bg-muted text-muted-foreground";
 };
 
+// FIX 1: Added "Fragile Growth Structure" and all known tiers
 const classColor = (c: string) => {
   if (c === "Structured Growth Engine") return "text-green-600 bg-green-50 border-green-200";
   if (c === "Early but Sound") return "text-blue-600 bg-blue-50 border-blue-200";
@@ -75,187 +77,102 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
 
   useEffect(() => { loadData(); }, [projectId]);
 
-  // Dummy scores data
-  const dummyScores = {
-    proj1: {
-      growth_score: 82,
-      classification: "Strong Growth",
-      action_directive: "Scale Aggressively",
-      scale_risk_level: "Low",
-      action_summary: "Strong growth potential with solid market entry strategy and scalable acquisition engine.",
-      entry_score: 85,
-      org_score: 78,
-      demand_score: 88,
-      conversion_score: 82,
-      scale_score: 80,
-      economics_score: 79,
-      economics_ltv_cac_ratio: 3.2,
-      gtm_blueprint: {
-        executive_summary: {
-          gtm_maturity_tier: "Structured Growth Engine",
-          ltv_cac_snapshot: "3.2x",
-          growth_risk_tier: "Low",
-          primary_growth_constraint: "Channel optimization",
-          strategic_insight: "Strong product-market fit with clear scaling path through optimized acquisition channels."
-        },
-        reasoning_trace: {
-          stage_2_demand: { classification: "High", reasoning: "Strong market demand signals" },
-          stage_3_icp: { classification: "High", reasoning: "Well-defined ideal customer profile" },
-          stage_4_distribution: { classification: "Moderate", reasoning: "Good distribution channels identified" },
-          stage_5_economics: { classification: "High", reasoning: "Solid unit economics" },
-          stage_6_growth_model: { classification: "High", reasoning: "Scalable growth model" },
-          stage_7_experiment: { classification: "Moderate", reasoning: "Experimentation framework in place" },
-          stage_8_scale: { classification: "High", reasoning: "Clear scaling strategy" },
-          stage_9_risks: { "Technical Risk": "Low", "Market Risk": "Low", "Execution Risk": "Moderate" },
-          stage_10_constraint: "Channel optimization"
-        },
-        scoring_audit: {
-          base_score: 78,
-          pillar_scores: {
-            demand_intensity: { score: 13, reasoning: "Strong market signals" },
-            icp_precision: { score: 14, reasoning: "Clear customer profile" },
-            distribution_advantage: { score: 12, reasoning: "Good channels" },
-            unit_economics: { score: 13, reasoning: "Solid economics" },
-            growth_engine_alignment: { score: 13, reasoning: "Aligned growth model" },
-            scale_readiness: { score: 13, reasoning: "Ready to scale" }
-          },
-          final_score: 82
-        },
-        growth_confidence: {
-          overall: "High",
-          icp_clarity: 8,
-          economic_realism: 7,
-          retention_logic: 8,
-          channel_feasibility: 7,
-          capital_adequacy: 8,
-          reasoning: "Strong fundamentals across all growth dimensions."
-        },
-        market_entry_architecture: {
-          icp: {
-            demographic: "Tech-savvy professionals 25-45",
-            buying_trigger: "Need for productivity solutions",
-            budget_authority: "Mid-level managers with departmental budgets",
-            adoption_barrier: "Integration complexity"
-          },
-          wedge_strategy: {
-            why_this_segment: "High willingness to pay and clear ROI",
-            unfair_advantage: "Superior user experience",
-            expansion_path: "Horizontal expansion to adjacent use cases"
-          },
-          positioning: {
-            problem_framing: "Inefficient workflow management",
-            value_narrative: "Streamline operations with AI-powered insights",
-            competitive_framing: "More intuitive than enterprise solutions"
-          }
-        },
-        growth_engine: {
-          model_type: "Product-Led Growth",
-          model_justification: "Strong viral coefficients and network effects",
-          growth_loop: {
-            acquisition: "SEO & Content",
-            activation: "Onboarding Flow",
-            retention: "Product Usage",
-            monetization: "Subscription",
-            referral: "Team Sharing"
-          },
-          primary_lever: "Product Experience",
-          weakest_link: "Conversion Optimization",
-          compounding_mechanism: "Network Effects"
-        },
-        acquisition_engine: {
-          channels: [
-            {
-              name: "SEO & Content Marketing",
-              type: "Primary",
-              expected_cac_range: "$50-100",
-              why_fits_icp: "Tech-savvy users search for solutions",
-              cost_profile: "Low",
-              speed_profile: "Medium",
-              scaling_ceiling: "High",
-              risk_exposure: "Low"
-            },
-            {
-              name: "Paid Social",
-              type: "Secondary", 
-              expected_cac_range: "$75-150",
-              why_fits_icp: "Target professional demographics",
-              cost_profile: "Medium",
-              speed_profile: "Fast",
-              scaling_ceiling: "Medium",
-              risk_exposure: "Moderate"
-            }
-          ]
-        },
-        conversion_architecture: {
-          funnel_stages: [
-            { stage: "Awareness", conversion_rate: "3%", key_action: "Content consumption" },
-            { stage: "Interest", conversion_rate: "12%", key_action: "Feature exploration" },
-            { stage: "Trial", conversion_rate: "25%", key_action: "Account creation" },
-            { stage: "Activation", conversion_rate: "60%", key_action: "Key feature usage" },
-            { stage: "Revenue", conversion_rate: "8%", key_action: "Subscription upgrade" }
-          ],
-          activation_metric: "Time to first key action",
-          time_to_value: "7 days",
-          conversion_bottleneck: "Trial to activation"
-        },
-        unit_economics: {
-          cac_estimate_range: "$75-125",
-          ltv_sensitivity: "High retention drives LTV",
-          economic_fragility: "Low"
-        },
-        scale_pivot_kill: {
-          scale_signals: ["Strong product-market fit", "Scalable acquisition", "Positive unit economics"],
-          pivot_signals: ["Channel optimization needed", "Conversion bottleneck"],
-          kill_signals: []
-        },
-        ninety_day_roadmap: [
-          { phase: "Month 1", focus: "Channel optimization", metrics: "Reduce CAC by 20%" },
-          { phase: "Month 2", focus: "Conversion improvement", metrics: "Increase trial-to-paid by 15%" },
-          { phase: "Month 3", focus: "Scale acquisition", metrics: "Double user base" }
-        ],
-        experimentation_architecture: [
-          { experiment: "A/B Test onboarding", priority: "High", expected_impact: "15% lift in activation" },
-          { experiment: "Channel mix optimization", priority: "Medium", expected_impact: "10% CAC reduction" }
-        ],
-        growth_risk_clusters: {
-          "Market Risk": "Low",
-          "Technical Risk": "Low", 
-          "Execution Risk": "Moderate",
-          "Competitive Risk": "Moderate"
-        },
-        capital_deployment: {
-          total_required: "$250K",
-          allocation: { "Acquisition": "40%", "Product": "35%", "Team": "25%" },
-          runway: "18 months"
-        },
-        growth_readiness_gaps: ["Sales process needed", "Customer success framework"],
-        investor_snapshot: {
-          traction_level: "Strong early traction",
-          next_milestone: "10K paying customers",
-          funding_round: "Series A",
-          key_metrics: ["3.2x LTV/CAC", "85% growth score", "Low risk profile"]
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3/${projectId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const projectData = data.data;
+
+        if (projectData.phase3_status === 'not_started') {
+          setScores(null);
+          setLoading(false);
+          return;
         }
+
+        const phase3Analysis = projectData.phase3_growth_data?.phase3_analysis || projectData.phase3_analysis;
+        const pillarScores = phase3Analysis?.scoring_audit?.pillar_scores || {};
+
+        // FIX 2: Layer scores now correctly map to actual DB pillar keys
+        const transformedData = {
+          growth_score: projectData.growth_score,
+          classification: projectData.growth_classification,
+          action_directive: phase3Analysis?.executive_summary?.action_directive,
+          growth_risk_level: phase3Analysis?.executive_summary?.growth_risk_level,
+          action_summary: phase3Analysis?.executive_summary?.action_summary,
+          growth_maturity_tier: phase3Analysis?.executive_summary?.growth_maturity_tier,
+          primary_constraint: "Customer discovery validation required",
+          ltv_cac_ratio: "Not calculated",
+
+          // FIX 3: Layer breakdown now uses correct pillar keys from DB
+          entry_score: pillarScores?.customer_clarity?.score ?? 0,
+          org_score: pillarScores?.market_timing?.score ?? 0,
+          demand_score: pillarScores?.distribution_feasibility?.score ?? 0,
+          conversion_score: pillarScores?.revenue_model?.score ?? 0,
+          scale_score: pillarScores?.pricing_strategy?.score ?? 0,
+          economics_score: pillarScores?.sales_efficiency?.score ?? 0,
+          retention_score: pillarScores?.retention_potential?.score ?? 0,
+          competitive_score: pillarScores?.competitive_advantage?.score ?? 0,
+
+          base_score: phase3Analysis?.scoring_audit?.base_score,
+          final_score: phase3Analysis?.scoring_audit?.final_score,
+          risk_penalty: phase3Analysis?.scoring_audit?.risk_penalty,
+          maturity_boost: phase3Analysis?.scoring_audit?.maturity_boost,
+
+          // Growth Confidence Index
+          growth_confidence_overall: phase3Analysis?.growth_confidence?.overall,
+          growth_confidence_customer_clarity: phase3Analysis?.growth_confidence?.customer_clarity,
+          growth_confidence_market_timing: phase3Analysis?.growth_confidence?.market_timing,
+          growth_confidence_distribution_feasibility: phase3Analysis?.growth_confidence?.distribution_feasibility,
+          growth_confidence_revenue_model: phase3Analysis?.growth_confidence?.revenue_model,
+          growth_confidence_pricing_strategy: phase3Analysis?.growth_confidence?.pricing_strategy,
+          growth_confidence_sales_efficiency: phase3Analysis?.growth_confidence?.sales_efficiency,
+          growth_confidence_retention_potential: phase3Analysis?.growth_confidence?.retention_potential,
+          growth_confidence_competitive_advantage: phase3Analysis?.growth_confidence?.competitive_advantage,
+
+          scale_signals: phase3Analysis?.scale_pivot_kill?.scale_signals || [],
+          pivot_signals: phase3Analysis?.scale_pivot_kill?.pivot_signals || [],
+          kill_signals: phase3Analysis?.scale_pivot_kill?.kill_signals || [],
+          gtm_blueprint: phase3Analysis,
+        };
+
+        setScores(transformedData);
+      } else {
+        setScores(null);
       }
+    } catch (error) {
+      console.error('Failed to load Phase 3 dashboard data:', error);
+      setScores(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadData = async () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const data = dummyScores[projectId as keyof typeof dummyScores];
-      setScores(data);
-      setLoading(false);
-    }, 1000);
-  };
-
   const confirmLock = async () => {
-    // Simulate phase locking
-    setTimeout(() => {
-      setShowLockModal(false);
-      toast.success("Phase 3 locked. Venture Blueprint complete!");
-      onLockProceed?.();
-    }, 1000);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3/${projectId}/lock`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setShowLockModal(false);
+        toast.success("Phase 3 locked. Venture Blueprint complete!");
+        onLockProceed?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to lock Phase 3");
+      }
+    } catch (error) {
+      console.error('Phase 3 lock error:', error);
+      toast.error("Network error while locking Phase 3");
+    }
   };
 
   if (loading) return <div className="flex justify-center py-16"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
@@ -287,37 +204,66 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
   const plan90 = roadmap.length > 0 ? roadmap : (scores.action_90day_plan as any[]) || [];
   const expData = experiments.length > 0 ? experiments : (scores.action_experiment_priorities as any[]) || [];
 
+  // FIX 4: Layer breakdown labels now correctly reflect what each pillar score actually measures
   const layerData = [
-    { layer: "Entry", score: Number(scores.entry_score), weight: "15%" },
-    { layer: "Org", score: Number(scores.org_score), weight: "15%" },
-    { layer: "Demand", score: Number(scores.demand_score), weight: "20%" },
-    { layer: "Conversion", score: Number(scores.conversion_score), weight: "20%" },
-    { layer: "Scale Ctrl", score: Number(scores.scale_score), weight: "15%" },
-    { layer: "Economics", score: Number(scores.economics_score), weight: "15%" },
-  ];
+    { layer: "Customer Clarity", score: Number(scores.entry_score), weight: "20%" },
+    { layer: "Market Timing", score: Number(scores.org_score), weight: "20%" },
+    { layer: "Distribution", score: Number(scores.demand_score), weight: "15%" },
+    { layer: "Revenue Model", score: Number(scores.conversion_score), weight: "20%" },
+    { layer: "Pricing Strategy", score: Number(scores.scale_score), weight: "15%" },
+    { layer: "Sales Efficiency", score: Number(scores.economics_score), weight: "20%" },
+    { layer: "Retention Potential", score: Number(scores.retention_score), weight: "20%" },
+    { layer: "Competitive Advantage", score: Number(scores.competitive_score), weight: "20%" },
+  ].filter(l => l.score > 0); // only show pillars that have data
 
   const pillarScores = scoringAudit.pillar_scores || {};
+
+  // FIX 5: pillarEntries now matches actual DB keys exactly
   const pillarEntries = [
-    { key: "demand_intensity", label: "Demand Intensity", max: 15, icon: <TrendingUp className="h-3.5 w-3.5" /> },
-    { key: "icp_precision", label: "ICP Precision", max: 15, icon: <Target className="h-3.5 w-3.5" /> },
-    { key: "distribution_advantage", label: "Distribution", max: 15, icon: <Megaphone className="h-3.5 w-3.5" /> },
-    { key: "unit_economics", label: "Unit Economics", max: 15, icon: <DollarSign className="h-3.5 w-3.5" /> },
-    { key: "growth_engine_alignment", label: "Growth Alignment", max: 15, icon: <Rocket className="h-3.5 w-3.5" /> },
-    { key: "scale_readiness", label: "Scale Readiness", max: 15, icon: <Activity className="h-3.5 w-3.5" /> },
+    { key: "customer_clarity",         label: "Customer Clarity",      max: 20, icon: <Target className="h-3.5 w-3.5" /> },
+    { key: "market_timing",            label: "Market Timing",         max: 20, icon: <TrendingUp className="h-3.5 w-3.5" /> },
+    { key: "distribution_feasibility", label: "Distribution",          max: 15, icon: <Megaphone className="h-3.5 w-3.5" /> },
+    { key: "revenue_model",            label: "Revenue Model",         max: 20, icon: <DollarSign className="h-3.5 w-3.5" /> },
+    { key: "pricing_strategy",         label: "Pricing Strategy",      max: 15, icon: <Tag className="h-3.5 w-3.5" /> },
+    { key: "sales_efficiency",         label: "Sales Efficiency",      max: 20, icon: <Users className="h-3.5 w-3.5" /> },
+    { key: "retention_potential",      label: "Retention Potential",   max: 20, icon: <RefreshCw className="h-3.5 w-3.5" /> },
+    { key: "competitive_advantage",    label: "Competitive Advantage", max: 20, icon: <Swords className="h-3.5 w-3.5" /> },
   ];
 
   const reasoningStages = [
-    { key: "stage_2_demand", label: "Demand Intensity", icon: <TrendingUp className="h-3.5 w-3.5" /> },
-    { key: "stage_3_icp", label: "ICP Precision", icon: <Target className="h-3.5 w-3.5" /> },
-    { key: "stage_4_distribution", label: "Distribution Advantage", icon: <Megaphone className="h-3.5 w-3.5" /> },
-    { key: "stage_5_economics", label: "Unit Economics", icon: <DollarSign className="h-3.5 w-3.5" /> },
-    { key: "stage_6_growth_model", label: "Growth Model", icon: <Rocket className="h-3.5 w-3.5" /> },
-    { key: "stage_7_experiment", label: "Experiment Readiness", icon: <Beaker className="h-3.5 w-3.5" /> },
-    { key: "stage_8_scale", label: "Scale Readiness", icon: <Activity className="h-3.5 w-3.5" /> },
+    { key: "stage_1_customer",    label: "Customer Clarity",    icon: <Target className="h-3.5 w-3.5" /> },
+    { key: "stage_2_trigger",     label: "Buying Triggers",     icon: <Zap className="h-3.5 w-3.5" /> },
+    { key: "stage_3_discovery",   label: "Customer Discovery",  icon: <Search className="h-3.5 w-3.5" /> },
+    { key: "stage_4_distribution",label: "Distribution Access", icon: <Megaphone className="h-3.5 w-3.5" /> },
+    { key: "stage_5_revenue",     label: "Revenue Model",       icon: <DollarSign className="h-3.5 w-3.5" /> },
+    { key: "stage_6_pricing",     label: "Pricing Strategy",    icon: <Tag className="h-3.5 w-3.5" /> },
+    { key: "stage_7_sales",       label: "Sales Motion",        icon: <Users className="h-3.5 w-3.5" /> },
+    { key: "stage_8_value",       label: "Time-to-Value",       icon: <Clock className="h-3.5 w-3.5" /> },
+    { key: "stage_9_retention",   label: "Retention Logic",     icon: <RefreshCw className="h-3.5 w-3.5" /> },
+    { key: "stage_10_competitive",label: "Competitive Edge",    icon: <Swords className="h-3.5 w-3.5" /> },
+    { key: "stage_11_channel",    label: "Channel Strategy",    icon: <Share2 className="h-3.5 w-3.5" /> },
+    { key: "stage_12_economics",  label: "Unit Economics",      icon: <Calculator className="h-3.5 w-3.5" /> },
+    { key: "stage_13_growth",     label: "Growth Target",       icon: <Target className="h-3.5 w-3.5" /> },
+    { key: "stage_14_capital",    label: "GTM Capital",         icon: <Briefcase className="h-3.5 w-3.5" /> },
+    { key: "stage_15_scale",      label: "Scale Intent",        icon: <Rocket className="h-3.5 w-3.5" /> },
   ];
+
+  // FIX 6: Helper to safely get a numeric confidence color (handles both numeric and string values)
+  const getConfidenceNumericColor = (val: any) => {
+    const n = Number(val);
+    if (!isNaN(n)) {
+      return n >= 80 ? "hsl(var(--primary))" : n >= 60 ? "hsl(var(--accent))" : "hsl(var(--destructive))";
+    }
+    // string fallback
+    const s = String(val).toLowerCase();
+    if (s === "high") return "hsl(var(--primary))";
+    if (s === "moderate") return "hsl(var(--accent))";
+    return "hsl(var(--destructive))";
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+
       {/* ========== 1. EXECUTIVE GTM SUMMARY ========== */}
       <Card className="border-2 border-primary/20">
         <CardHeader className="pb-3">
@@ -332,45 +278,48 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
               <p className="text-3xl font-bold text-primary">{Number(scores.growth_score).toFixed(0)}</p>
               <p className="text-xs text-muted-foreground mt-1">Growth Score</p>
             </div>
-            <div className={`rounded-xl p-4 text-center border ${classColor(exec.gtm_maturity_tier || scores.classification)}`}>
-              <p className="text-base font-bold">{exec.gtm_maturity_tier || scores.classification}</p>
+            {/* FIX 7: Uses growth_maturity_tier from exec first, then classification fallback */}
+            <div className={`rounded-xl p-4 text-center border ${classColor(exec.growth_maturity_tier || scores.growth_maturity_tier || scores.classification)}`}>
+              <p className="text-base font-bold">{exec.growth_maturity_tier || scores.growth_maturity_tier || scores.classification}</p>
               <p className="text-xs mt-1 opacity-70">GTM Maturity Tier</p>
             </div>
-            <div className={`rounded-xl p-4 text-center border ${directiveColor(scores.action_directive)}`}>
-              <p className="text-sm font-bold">{scores.action_directive}</p>
+            <div className={`rounded-xl p-4 text-center border ${directiveColor(exec.action_directive || scores.action_directive)}`}>
+              <p className="text-sm font-bold">{exec.action_directive || scores.action_directive}</p>
               <p className="text-xs mt-1 opacity-70">Action Directive</p>
             </div>
-            {growthConfidence.overall && (
-              <div className={`rounded-xl p-4 text-center border ${confidenceColor(growthConfidence.overall)}`}>
-                <p className="text-base font-bold">{growthConfidence.overall}</p>
+            {(growthConfidence.overall || scores.growth_confidence_overall) && (
+              <div className={`rounded-xl p-4 text-center border ${confidenceColor(growthConfidence.overall || scores.growth_confidence_overall)}`}>
+                <p className="text-base font-bold capitalize">{growthConfidence.overall || scores.growth_confidence_overall}</p>
                 <p className="text-xs mt-1 opacity-70">Growth Confidence</p>
               </div>
             )}
           </div>
+
           <div className="grid sm:grid-cols-3 gap-3">
             <div className="rounded-lg border p-3 text-center">
-              <p className="text-xl font-bold text-accent">{exec.ltv_cac_snapshot || `${Number(scores.economics_ltv_cac_ratio).toFixed(1)}x`}</p>
+              <p className="text-xl font-bold text-accent">{scores.ltv_cac_ratio || unitEcon.ltv_cac_ratio || "—"}</p>
               <p className="text-xs text-muted-foreground">LTV/CAC Ratio</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(exec.growth_risk_tier || scores.scale_risk_level)}`}>
-                {exec.growth_risk_tier || scores.scale_risk_level || "—"}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(exec.growth_risk_level || scores.growth_risk_level)}`}>
+                {exec.growth_risk_level || scores.growth_risk_level || "—"}
               </span>
               <p className="text-xs text-muted-foreground mt-1">Growth Risk</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <p className="text-xs font-medium text-primary">{exec.primary_growth_constraint || reasoningTrace.stage_10_constraint || "—"}</p>
+              <p className="text-xs font-medium text-primary">{scores.primary_constraint || reasoningTrace.stage_11_constraint || "—"}</p>
               <p className="text-xs text-muted-foreground mt-1">Primary Constraint</p>
             </div>
           </div>
+
           {exec.strategic_insight && (
             <div className="rounded-lg bg-muted/50 p-4 border-l-4 border-primary">
               <p className="text-sm leading-relaxed">{exec.strategic_insight}</p>
             </div>
           )}
-          {!exec.strategic_insight && scores.action_summary && (
+          {!exec.strategic_insight && (exec.action_summary || scores.action_summary) && (
             <div className="rounded-lg bg-muted/50 p-4 border-l-4 border-accent">
-              <p className="text-sm leading-relaxed">{scores.action_summary}</p>
+              <p className="text-sm leading-relaxed">{exec.action_summary || scores.action_summary}</p>
             </div>
           )}
         </CardContent>
@@ -392,7 +341,9 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
                 <div key={key} className="rounded-lg border p-3">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 text-sm font-medium">{icon} {label}</div>
-                    <Badge variant="outline" className="text-xs">{stage.classification}</Badge>
+                    {stage.classification && (
+                      <Badge variant="outline" className="text-xs">{stage.classification}</Badge>
+                    )}
                   </div>
                   {stage.reasoning && <p className="text-xs text-muted-foreground">{stage.reasoning}</p>}
                   {stage.justification && <p className="text-xs text-muted-foreground">{stage.justification}</p>}
@@ -403,11 +354,15 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
                 </div>
               );
             })}
-            {reasoningTrace.stage_9_risks && (
+
+            {/* FIX 8: stage_9_risks key corrected — DB uses stage_11_risks */}
+            {(reasoningTrace.stage_9_risks || reasoningTrace.stage_11_risks) && (
               <div className="rounded-lg border p-3">
-                <p className="text-sm font-medium mb-2 flex items-center gap-2"><Shield className="h-3.5 w-3.5" /> Risk Classification</p>
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Shield className="h-3.5 w-3.5" /> Risk Classification
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(reasoningTrace.stage_9_risks).map(([k, v]) => (
+                  {Object.entries(reasoningTrace.stage_9_risks || reasoningTrace.stage_11_risks).map(([k, v]) => (
                     <span key={k} className={`text-[10px] px-2 py-0.5 rounded-full border ${severityColor(v as string)}`}>
                       {k.replace(/_/g, " ")}: {v as string}
                     </span>
@@ -415,9 +370,13 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
                 </div>
               </div>
             )}
-            {reasoningTrace.stage_10_constraint && (
+
+            {/* FIX 9: Also check stage_11_constraint from DB */}
+            {(reasoningTrace.stage_10_constraint || reasoningTrace.stage_11_constraint) && (
               <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-3">
-                <p className="text-xs font-semibold text-destructive">{reasoningTrace.stage_10_constraint}</p>
+                <p className="text-xs font-semibold text-destructive">
+                  {reasoningTrace.stage_10_constraint || reasoningTrace.stage_11_constraint}
+                </p>
               </div>
             )}
           </CardContent>
@@ -433,22 +392,30 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Pillar scores */}
+
+            {/* FIX 10: Pillar bars now render using correct DB keys */}
             {Object.keys(pillarScores).length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground">6-Pillar Base Score</p>
+                <p className="text-xs font-semibold text-muted-foreground">Pillar Scores</p>
                 {pillarEntries.map(({ key, label, max, icon }) => {
                   const p = pillarScores[key];
                   if (!p) return null;
-                  const pct = (Number(p.score) / max) * 100;
+                  const score = Number(p.score);
+                  const pct = Math.min((score / max) * 100, 100);
                   return (
                     <div key={key}>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="font-medium flex items-center gap-1.5">{icon} {label}</span>
-                        <span className="font-bold">{p.score}/{max}</span>
+                        <span className="font-bold">{score}/{max}</span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: pct >= 70 ? "hsl(var(--primary))" : pct >= 50 ? "hsl(var(--accent))" : "hsl(var(--destructive))" }} />
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: pct >= 70 ? "hsl(var(--primary))" : pct >= 50 ? "hsl(var(--accent))" : "hsl(var(--destructive))"
+                          }}
+                        />
                       </div>
                       {p.reasoning && <p className="text-[10px] text-muted-foreground mt-0.5">{p.reasoning}</p>}
                     </div>
@@ -462,30 +429,29 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
               {scoringAudit.base_score != null && (
                 <div className="rounded-lg border p-3 text-center">
                   <p className="text-lg font-bold text-primary">{scoringAudit.base_score}</p>
-                  <p className="text-[10px] text-muted-foreground">Base Score (max 90)</p>
+                  <p className="text-[10px] text-muted-foreground">Base Score</p>
                 </div>
               )}
-              {scoringAudit.experiment_discipline && (
+              {scoringAudit.risk_penalty != null && (
                 <div className="rounded-lg border p-3 text-center">
-                  <p className="text-lg font-bold text-accent">+{scoringAudit.experiment_discipline.score}</p>
-                  <p className="text-[10px] text-muted-foreground">Experiment ({scoringAudit.experiment_discipline.classification})</p>
+                  <p className="text-lg font-bold text-destructive">-{scoringAudit.risk_penalty}</p>
+                  <p className="text-[10px] text-muted-foreground">Risk Penalty</p>
                 </div>
               )}
-              {scoringAudit.validation_boost && (
+              {scoringAudit.maturity_boost != null && (
                 <div className="rounded-lg border p-3 text-center">
-                  <p className="text-lg font-bold text-green-600">+{scoringAudit.validation_boost.score}</p>
-                  <p className="text-[10px] text-muted-foreground">Validation Boost</p>
+                  <p className="text-lg font-bold text-green-600">+{scoringAudit.maturity_boost}</p>
+                  <p className="text-[10px] text-muted-foreground">Maturity Boost</p>
                 </div>
               )}
-              {scoringAudit.risk_penalty && (
+              {scoringAudit.final_score != null && (
                 <div className="rounded-lg border p-3 text-center">
-                  <p className="text-lg font-bold text-destructive">{scoringAudit.risk_penalty.penalty}</p>
-                  <p className="text-[10px] text-muted-foreground">{scoringAudit.risk_penalty.high_risk_count} High Risks</p>
+                  <p className="text-lg font-bold text-primary">{scoringAudit.final_score}</p>
+                  <p className="text-[10px] text-muted-foreground">Final Score</p>
                 </div>
               )}
             </div>
 
-            {/* Hard ceilings */}
             {scoringAudit.hard_ceilings_applied?.length > 0 && (
               <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-3">
                 <p className="text-xs font-semibold text-destructive mb-1">Hard Ceilings Applied</p>
@@ -509,7 +475,7 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
       )}
 
       {/* ========== GROWTH CONFIDENCE INDEX ========== */}
-      {growthConfidence.overall && (
+      {(growthConfidence.overall || scores.growth_confidence_overall) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -517,20 +483,38 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
-                { label: "ICP Clarity", val: growthConfidence.icp_clarity },
-                { label: "Economic Realism", val: growthConfidence.economic_realism },
-                { label: "Retention Logic", val: growthConfidence.retention_logic },
-                { label: "Channel Feasibility", val: growthConfidence.channel_feasibility },
-                { label: "Capital Adequacy", val: growthConfidence.capital_adequacy },
+                { label: "Customer Clarity",    val: growthConfidence.customer_clarity         ?? scores.growth_confidence_customer_clarity },
+                { label: "Market Timing",        val: growthConfidence.market_timing            ?? scores.growth_confidence_market_timing },
+                { label: "Distribution",         val: growthConfidence.distribution_feasibility ?? scores.growth_confidence_distribution_feasibility },
+                { label: "Revenue Model",        val: growthConfidence.revenue_model            ?? scores.growth_confidence_revenue_model },
+                { label: "Pricing Strategy",     val: growthConfidence.pricing_strategy         ?? scores.growth_confidence_pricing_strategy },
               ].map(({ label, val }) => val != null ? (
                 <div key={label} className="rounded-lg border p-2 text-center">
-                  <p className="text-lg font-bold" style={{ color: Number(val) >= 7 ? "hsl(var(--primary))" : Number(val) >= 5 ? "hsl(var(--accent))" : "hsl(var(--destructive))" }}>{val}/10</p>
+                  <p className="text-lg font-bold" style={{ color: getConfidenceNumericColor(val) }}>{val}</p>
                   <p className="text-[9px] text-muted-foreground">{label}</p>
                 </div>
               ) : null)}
             </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { label: "Sales Efficiency",      val: growthConfidence.sales_efficiency      ?? scores.growth_confidence_sales_efficiency },
+                { label: "Retention Potential",   val: growthConfidence.retention_potential   ?? scores.growth_confidence_retention_potential },
+                { label: "Competitive Advantage", val: growthConfidence.competitive_advantage ?? scores.growth_confidence_competitive_advantage },
+                { label: "Overall",               val: growthConfidence.overall               ?? scores.growth_confidence_overall },
+              ].map(({ label, val }) => val != null ? (
+                <div key={label} className="rounded-lg border p-2 text-center">
+                  <p
+                    className="text-lg font-bold capitalize"
+                    style={{ color: getConfidenceNumericColor(val) }}
+                  >{val}</p>
+                  <p className="text-[9px] text-muted-foreground">{label}</p>
+                </div>
+              ) : null)}
+            </div>
+
             {growthConfidence.reasoning && (
               <p className="text-xs text-muted-foreground border-l-2 border-accent/30 pl-3">{growthConfidence.reasoning}</p>
             )}
@@ -539,33 +523,49 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
       )}
 
       {/* ========== LAYER BREAKDOWN ========== */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Eye className="h-4 w-4 text-muted-foreground" /> Layer Breakdown
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {layerData.map((entry) => {
-              const tooltip = getLayerTooltip(entry.layer, entry.score);
-              return (
-                <ScoreTooltip key={entry.layer} label={entry.layer} score={entry.score} meaning={tooltip.meaning} reason={tooltip.reason} improvement={tooltip.improvement}>
-                  <div className="cursor-help">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{entry.layer} <span className="text-muted-foreground">({entry.weight})</span></span>
-                      <span className="font-bold" style={{ color: getBarColor(entry.score) }}>{entry.score.toFixed(0)}</span>
+      {layerData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Eye className="h-4 w-4 text-muted-foreground" /> Pillar Score Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {layerData.map((entry) => {
+                const tooltip = getLayerTooltip(entry.layer, entry.score);
+                return (
+                  <ScoreTooltip
+                    key={entry.layer}
+                    label={entry.layer}
+                    score={entry.score}
+                    meaning={tooltip.meaning}
+                    reason={tooltip.reason}
+                    improvement={tooltip.improvement}
+                  >
+                    <div className="cursor-help">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium">
+                          {entry.layer} <span className="text-muted-foreground">({entry.weight})</span>
+                        </span>
+                        <span className="font-bold" style={{ color: getBarColor(entry.score) }}>
+                          {entry.score.toFixed(0)}
+                        </span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(entry.score, 100)}%`, backgroundColor: getBarColor(entry.score) }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${entry.score}%`, backgroundColor: getBarColor(entry.score) }} />
-                    </div>
-                  </div>
-                </ScoreTooltip>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                  </ScoreTooltip>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ========== 2. MARKET ENTRY ARCHITECTURE ========== */}
       {(entryArch.icp || entryArch.wedge_strategy || entryArch.positioning || scores.entry_icp) && (
@@ -683,7 +683,9 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold">{c.name || c.channel}</p>
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${c.type === "Primary" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{c.type || c.priority}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${c.type === "Primary" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {c.type || c.priority}
+                      </span>
                     </div>
                     {c.expected_cac_range && <span className="text-xs text-muted-foreground">CAC: {c.expected_cac_range}</span>}
                   </div>
@@ -779,7 +781,7 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
               {unitEcon.payback_period && <div className="rounded-lg border p-3 text-center"><p className="text-sm font-bold text-primary">{unitEcon.payback_period}</p><p className="text-[10px] text-muted-foreground">Payback Period</p></div>}
               {unitEcon.contribution_margin && <div className="rounded-lg border p-3 text-center"><p className="text-sm font-bold">{unitEcon.contribution_margin}</p><p className="text-[10px] text-muted-foreground">Contribution Margin</p></div>}
               {unitEcon.burn_multiple != null && <div className="rounded-lg border p-3 text-center"><p className="text-sm font-bold">{unitEcon.burn_multiple}x</p><p className="text-[10px] text-muted-foreground">Burn Multiple</p></div>}
-              <div className="rounded-lg border p-3 text-center"><p className="text-sm font-bold text-accent">{Number(scores.economics_ltv_cac_ratio).toFixed(1)}x</p><p className="text-[10px] text-muted-foreground">LTV/CAC</p></div>
+              {unitEcon.ltv_cac_ratio && <div className="rounded-lg border p-3 text-center"><p className="text-sm font-bold text-accent">{unitEcon.ltv_cac_ratio}</p><p className="text-[10px] text-muted-foreground">LTV/CAC</p></div>}
             </div>
             {unitEcon.fragility_rationale && <p className="text-xs text-muted-foreground border-l-2 border-green-200 pl-3">{unitEcon.fragility_rationale}</p>}
           </CardContent>
@@ -797,11 +799,17 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
         <CardContent>
           <div className="grid sm:grid-cols-3 gap-4">
             <div className="rounded-lg border border-green-200 p-4">
-              <div className="flex items-center gap-2 mb-3"><TrendingUp className="h-4 w-4 text-green-600" /><h6 className="text-sm font-semibold">Scale Signals</h6></div>
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <h6 className="text-sm font-semibold">Scale Signals</h6>
+              </div>
               <div className="space-y-2">
                 {scaleSignals.map((s: any, i: number) => (
                   <div key={i} className="text-xs">
-                    <div className="flex gap-1.5 items-start"><CheckCircle2 className="h-3 w-3 text-green-600 mt-0.5 shrink-0" /><span className="font-medium">{s.signal || s}</span></div>
+                    <div className="flex gap-1.5 items-start">
+                      <CheckCircle2 className="h-3 w-3 text-green-600 mt-0.5 shrink-0" />
+                      <span className="font-medium">{s.signal || s}</span>
+                    </div>
                     {s.metric_threshold && <p className="text-[10px] text-muted-foreground ml-4">Threshold: {s.metric_threshold}</p>}
                     {s.observation_period && <p className="text-[10px] text-muted-foreground ml-4">Window: {s.observation_period}</p>}
                   </div>
@@ -810,11 +818,17 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
               </div>
             </div>
             <div className="rounded-lg border border-amber-200 p-4">
-              <div className="flex items-center gap-2 mb-3"><AlertTriangle className="h-4 w-4 text-amber-600" /><h6 className="text-sm font-semibold">Pivot Signals</h6></div>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <h6 className="text-sm font-semibold">Pivot Signals</h6>
+              </div>
               <div className="space-y-2">
                 {pivotSignals.map((s: any, i: number) => (
                   <div key={i} className="text-xs">
-                    <div className="flex gap-1.5 items-start"><AlertTriangle className="h-3 w-3 text-amber-600 mt-0.5 shrink-0" /><span className="font-medium">{s.signal || s}</span></div>
+                    <div className="flex gap-1.5 items-start">
+                      <AlertTriangle className="h-3 w-3 text-amber-600 mt-0.5 shrink-0" />
+                      <span className="font-medium">{s.signal || s}</span>
+                    </div>
                     {s.metric_threshold && <p className="text-[10px] text-muted-foreground ml-4">Threshold: {s.metric_threshold}</p>}
                   </div>
                 ))}
@@ -822,11 +836,17 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
               </div>
             </div>
             <div className="rounded-lg border border-red-200 p-4">
-              <div className="flex items-center gap-2 mb-3"><XCircle className="h-4 w-4 text-red-600" /><h6 className="text-sm font-semibold">Kill Signals</h6></div>
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <h6 className="text-sm font-semibold">Kill Signals</h6>
+              </div>
               <div className="space-y-2">
                 {killSignals.map((s: any, i: number) => (
                   <div key={i} className="text-xs">
-                    <div className="flex gap-1.5 items-start"><XCircle className="h-3 w-3 text-red-600 mt-0.5 shrink-0" /><span className="font-medium">{s.signal || s}</span></div>
+                    <div className="flex gap-1.5 items-start">
+                      <XCircle className="h-3 w-3 text-red-600 mt-0.5 shrink-0" />
+                      <span className="font-medium">{s.signal || s}</span>
+                    </div>
                     {s.metric_threshold && <p className="text-[10px] text-muted-foreground ml-4">Threshold: {s.metric_threshold}</p>}
                   </div>
                 ))}
@@ -857,13 +877,21 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
                   {p.deliverables?.length > 0 && (
                     <ul className="space-y-1 mb-2">
                       {p.deliverables.map((d: string, j: number) => (
-                        <li key={j} className="text-xs flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-primary mt-0.5 shrink-0" />{d}</li>
+                        <li key={j} className="text-xs flex items-start gap-1.5">
+                          <CheckCircle2 className="h-3 w-3 text-primary mt-0.5 shrink-0" />{d}
+                        </li>
                       ))}
                     </ul>
                   )}
                   <div className="flex flex-wrap gap-3 text-[10px]">
-                    {p.kpi_targets?.length > 0 && <span className="bg-primary/5 text-primary px-2 py-0.5 rounded-full">📊 {Array.isArray(p.kpi_targets) ? p.kpi_targets.join(", ") : p.kpi_targets}</span>}
-                    {p.decision_gate && <span className="bg-accent/5 text-accent px-2 py-0.5 rounded-full">🚦 {p.decision_gate}</span>}
+                    {p.kpi_targets?.length > 0 && (
+                      <span className="bg-primary/5 text-primary px-2 py-0.5 rounded-full">
+                        📊 {Array.isArray(p.kpi_targets) ? p.kpi_targets.join(", ") : p.kpi_targets}
+                      </span>
+                    )}
+                    {p.decision_gate && (
+                      <span className="bg-accent/5 text-accent px-2 py-0.5 rounded-full">🚦 {p.decision_gate}</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -934,7 +962,10 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
                   {orgGrowth.hiring_triggers.map((t: any, i: number) => (
                     <div key={i} className="text-xs flex gap-2 items-start">
                       <Zap className="h-3 w-3 text-accent mt-0.5 shrink-0" />
-                      <span><span className="font-medium">{t.trigger}</span> → Hire: {t.role_to_add}{t.metric_threshold && ` (${t.metric_threshold})`}</span>
+                      <span>
+                        <span className="font-medium">{t.trigger}</span> → Hire: {t.role_to_add}
+                        {t.metric_threshold && ` (${t.metric_threshold})`}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -955,11 +986,11 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
           <CardContent>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
-                { label: "Acquisition Risk", data: riskClusters.acquisition_risk },
-                { label: "Retention Risk", data: riskClusters.retention_risk },
-                { label: "Monetization Risk", data: riskClusters.monetization_risk },
-                { label: "Channel Dependency", data: riskClusters.channel_dependency_risk },
-                { label: "Economic Risk", data: riskClusters.economic_risk },
+                { label: "Acquisition Risk",      data: riskClusters.acquisition_risk },
+                { label: "Retention Risk",         data: riskClusters.retention_risk },
+                { label: "Monetization Risk",      data: riskClusters.monetization_risk },
+                { label: "Channel Dependency",     data: riskClusters.channel_dependency_risk },
+                { label: "Economic Risk",          data: riskClusters.economic_risk },
               ].map(({ label, data }) => data ? (
                 <div key={label} className="rounded-lg border p-4 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1045,9 +1076,24 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {investorSnap.growth_model_type && <div className="rounded-lg bg-accent/5 border border-accent/20 p-4 text-center"><Badge className="mb-1">{investorSnap.growth_model_type}</Badge><p className="text-xs text-muted-foreground mt-1">Growth Model</p></div>}
-              {investorSnap.capital_for_scale && <div className="rounded-lg border p-4 text-center"><p className="text-xl font-bold text-accent">{fmt(investorSnap.capital_for_scale)}</p><p className="text-xs text-muted-foreground">Capital for Scale</p></div>}
-              {investorSnap.time_to_predictable_growth && <div className="rounded-lg border p-4 text-center"><p className="text-xl font-bold text-primary">{investorSnap.time_to_predictable_growth}</p><p className="text-xs text-muted-foreground">To Predictable Growth</p></div>}
+              {investorSnap.growth_model_type && (
+                <div className="rounded-lg bg-accent/5 border border-accent/20 p-4 text-center">
+                  <Badge className="mb-1">{investorSnap.growth_model_type}</Badge>
+                  <p className="text-xs text-muted-foreground mt-1">Growth Model</p>
+                </div>
+              )}
+              {investorSnap.capital_for_scale && (
+                <div className="rounded-lg border p-4 text-center">
+                  <p className="text-xl font-bold text-accent">{fmt(investorSnap.capital_for_scale)}</p>
+                  <p className="text-xs text-muted-foreground">Capital for Scale</p>
+                </div>
+              )}
+              {investorSnap.time_to_predictable_growth && (
+                <div className="rounded-lg border p-4 text-center">
+                  <p className="text-xl font-bold text-primary">{investorSnap.time_to_predictable_growth}</p>
+                  <p className="text-xs text-muted-foreground">To Predictable Growth</p>
+                </div>
+              )}
             </div>
             <div className="grid sm:grid-cols-2 gap-4 mt-4">
               {investorSnap.entry_strategy && <div className="rounded-lg border p-3"><p className="text-xs font-medium text-primary mb-1">Entry Strategy</p><p className="text-sm">{investorSnap.entry_strategy}</p></div>}
@@ -1060,7 +1106,9 @@ export default function Phase3Dashboard({ projectId, onRerun, onLockProceed }: P
 
       {/* ========== ACTIONS ========== */}
       <div className="flex flex-wrap gap-3 justify-center pt-4">
-        <Button variant="outline" className="gap-2" onClick={onRerun}><RotateCcw className="h-4 w-4" /> Re-run Analysis</Button>
+        <Button variant="outline" className="gap-2" onClick={onRerun}>
+          <RotateCcw className="h-4 w-4" /> Re-run Analysis
+        </Button>
         <Button variant="hero" className="gap-2" onClick={() => setShowLockModal(true)}>
           <Lock className="h-4 w-4" /> Lock & View Master Summary <ArrowRight className="h-4 w-4" />
         </Button>

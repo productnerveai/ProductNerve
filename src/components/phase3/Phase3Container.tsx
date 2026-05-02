@@ -7,33 +7,14 @@ import PhaseFileUpload from "@/components/shared/PhaseFileUpload";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase3ContainerProps {
   projectId: string;
   phase2Status: string;
   onPhaseComplete?: () => void | Promise<void>;
 }
 
-// Dummy phase data
-const dummyPhaseData = {
-  proj1: {
-    phase3_status: "complete",
-    intake_complete: true,
-    growth_score: 82,
-    classification: "Strong Growth"
-  },
-  proj2: {
-    phase3_status: "scoring",
-    intake_complete: true,
-    growth_score: null,
-    classification: null
-  },
-  proj3: {
-    phase3_status: "not_started",
-    intake_complete: false,
-    growth_score: null,
-    classification: null
-  }
-};
 
 // Helper function to check if phase is complete
 const isPhaseComplete = (status: string) => {
@@ -42,6 +23,7 @@ const isPhaseComplete = (status: string) => {
 
 export default function Phase3Container({ projectId, phase2Status, onPhaseComplete }: Phase3ContainerProps) {
   const [phase, setPhase] = useState<"loading" | "locked" | "intake" | "upload" | "scoring" | "dashboard" | "transition">("loading");
+  const [intakeData, setIntakeData] = useState<any>(null);
   const [phaseScore, setPhaseScore] = useState<number | null>(null);
   const [classification, setClassification] = useState<string | null>(null);
   const [rerunsUsed, setRerunsUsed] = useState(0);
@@ -49,46 +31,82 @@ export default function Phase3Container({ projectId, phase2Status, onPhaseComple
 
   useEffect(() => { loadState(); }, [projectId, phase2Status]);
 
-  const loadState = () => {
-    // Simulate loading state
-    setTimeout(() => {
-      if (!isPhaseComplete(phase2Status)) { 
-        setPhase("locked"); 
-        return; 
+  const loadState = async () => {
+    try {
+      if (!isPhaseComplete(phase2Status)) {
+        setPhase("locked");
+        return;
       }
 
-      const projectData = dummyPhaseData[projectId as keyof typeof dummyPhaseData];
-      if (!projectData) {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const projectData = data.data;
+
+        if (projectData.phase3_status === 'not_started') {
+          setPhase("intake");
+          return;
+        }
+
+        if (projectData.phase3_status === 'complete' || projectData.phase3_status === 'locked') {
+          setPhaseScore(projectData.growth_score);
+          setClassification(projectData.growth_classification);
+          setPhase("dashboard");
+          return;
+        }
+
+        if (!projectData.intake_complete) {
+          setPhase("intake");
+          return;
+        }
+
+        if (projectData.growth_score) {
+          setPhaseScore(projectData.growth_score);
+          setClassification(projectData.growth_classification);
+          setPhase("dashboard");
+          return;
+        }
+
+        setPhase("scoring");
+      } else {
         setPhase("intake");
-        return;
       }
-
-      const status = projectData.phase3_status || "not_started";
-
-      if (status === "complete" || status === "locked") { 
-        setPhaseScore(projectData.growth_score);
-        setClassification(projectData.classification);
-        setPhase("dashboard"); 
-        return; 
-      }
-
-      if (!projectData.intake_complete) {
-        setPhase("intake");
-        return;
-      }
-
-      if (projectData.growth_score) {
-        setPhaseScore(projectData.growth_score);
-        setClassification(projectData.classification);
-        setPhase("dashboard");
-        return;
-      }
-
-      setPhase("scoring");
-    }, 1000);
+    } catch (error) {
+      console.error('Failed to load Phase 3 state:', error);
+      setPhase("intake");
+    }
   };
 
-  const handleIntakeComplete = () => {
+  const handleIntakeComplete = async (data: any) => {
+    setIntakeData(data);
+    
+    // Save intake data to backend
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          intake_data: data
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to save intake data');
+      }
+    } catch (error) {
+      console.error('Error saving intake data:', error);
+    }
+    
     setPhase("upload");
   };
 
@@ -109,20 +127,37 @@ export default function Phase3Container({ projectId, phase2Status, onPhaseComple
     }, 2000);
   };
 
+  const confirmLock = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3/${projectId}/lock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success("Phase 3 locked. Opening Venture Summary...");
+        if (onPhaseComplete) {
+          onPhaseComplete();
+        } else {
+          setPhase("dashboard");
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to lock Phase 3");
+      }
+    } catch (error) {
+      console.error('Phase 3 lock error:', error);
+      toast.error("Network error while locking Phase 3");
+    }
+  };
+
   const handleProceed = () => {
     if (isProceeding) return;
     setIsProceeding(true);
-
-    // Simulate phase locking
-    setTimeout(() => {
-      toast.success("Phase 3 locked. Opening Venture Summary...");
-      if (onPhaseComplete) {
-        onPhaseComplete();
-      } else {
-        setPhase("dashboard");
-      }
-      setIsProceeding(false);
-    }, 2000);
+    confirmLock();
   };
 
   const handleRerun = () => {

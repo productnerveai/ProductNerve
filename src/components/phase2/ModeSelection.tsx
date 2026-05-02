@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Bot, Users, Server, Rocket, CheckCircle2, Clock, DollarSign, Shield, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const MODES = [
   {
     key: "ai_development",
@@ -72,26 +74,32 @@ export default function ModeSelection({ projectId, onModeSelected, recommendedMo
     }
     setSaving(true);
 
-    // Simulate saving with occasional failure for demo purposes
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-      
-      // Simulate occasional failure (10% chance)
-      if (Math.random() < 0.1) {
-        throw new Error("Simulated save error");
-      }
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          execution_mode: selected
+        })
+      });
 
-      // Simulate successful save
-      toast.success("Execution mode selected!");
-      onModeSelected(selected);
+      if (response.ok) {
+        toast.success("Execution mode selected!");
+        onModeSelected(selected);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to save execution mode");
+      }
     } catch (e) {
       console.error("Mode selection save failed:", e);
-      toast.warning("Save had an issue, but you can continue. We'll retry in the background.");
-      // Still proceed to avoid blocking user
-      onModeSelected(selected);
+      toast.error("Network error while saving execution mode");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const riskColor = (r: string) => {

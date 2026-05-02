@@ -8,61 +8,61 @@ import { useNavigate } from "react-router-dom";
 
 // Dummy notifications data
 const dummyNotifications = [
-  {
-    id: "notif1",
-    title: "Welcome to ProductNerve!",
-    message: "Get started by creating your first project and running it through our validation engine.",
-    type: "system",
-    priority: "high",
-    read_at: null,
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    user_id: "user123",
-    link: "/app/projects"
-  },
-  {
-    id: "notif2",
-    title: "Phase 1 Complete!",
-    message: "Congratulations! Your venture validation is complete. View your scores and insights.",
-    type: "system",
-    priority: "medium",
-    read_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    user_id: "user123",
-    link: "/app/projects/proj1/overview"
-  },
-  {
-    id: "notif3",
-    title: "New Feature: Product Studio",
-    message: "Check out our new Product Studio tools for generating user stories and PRDs.",
-    type: "info",
-    priority: "low",
-    read_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-    user_id: "user123",
-    link: "/app/studio"
-  },
-  {
-    id: "notif4",
-    title: "Payment Reminder",
-    message: "Your Pro subscription is due for renewal in 7 days.",
-    type: "billing",
-    priority: "medium",
-    read_at: null,
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    user_id: "user123",
-    link: "/app/billing"
-  },
-  {
-    id: "notif5",
-    title: "Phase 2 Ready",
-    message: "Your venture has passed Phase 1. Start Phase 2 to build your execution blueprint.",
-    type: "system",
-    priority: "high",
-    read_at: null,
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    user_id: "user123",
-    link: "/app/projects/proj1"
-  }
+  // {
+  //   id: "notif1",
+  //   title: "Welcome to ProductNerve!",
+  //   message: "Get started by creating your first project and running it through our validation engine.",
+  //   type: "system",
+  //   priority: "high",
+  //   read_at: null,
+  //   created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  //   user_id: "user123",
+  //   link: "/app/projects"
+  // },
+  // {
+  //   id: "notif2",
+  //   title: "Phase 1 Complete!",
+  //   message: "Congratulations! Your venture validation is complete. View your scores and insights.",
+  //   type: "system",
+  //   priority: "medium",
+  //   read_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  //   created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  //   user_id: "user123",
+  //   link: "/app/projects/proj1/overview"
+  // },
+  // {
+  //   id: "notif3",
+  //   title: "New Feature: Product Studio",
+  //   message: "Check out our new Product Studio tools for generating user stories and PRDs.",
+  //   type: "info",
+  //   priority: "low",
+  //   read_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  //   created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+  //   user_id: "user123",
+  //   link: "/app/studio"
+  // },
+  // {
+  //   id: "notif4",
+  //   title: "Payment Reminder",
+  //   message: "Your Pro subscription is due for renewal in 7 days.",
+  //   type: "billing",
+  //   priority: "medium",
+  //   read_at: null,
+  //   created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  //   user_id: "user123",
+  //   link: "/app/billing"
+  // },
+  // {
+  //   id: "notif5",
+  //   title: "Phase 2 Ready",
+  //   message: "Your venture has passed Phase 1. Start Phase 2 to build your execution blueprint.",
+  //   type: "system",
+  //   priority: "high",
+  //   read_at: null,
+  //   created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  //   user_id: "user123",
+  //   link: "/app/projects/proj1"
+  // }
 ];
 
 export default function NotificationsPage() {

@@ -14,6 +14,8 @@ import {
 import { toast } from "sonner";
 import { ScoreTooltip, getLayerTooltip } from "@/components/ui/score-tooltip";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase2DashboardProps {
   projectId: string;
   onRerun: () => void;
@@ -72,146 +74,128 @@ const modeLabel: Record<string, string> = {
   venture_backed: "Venture-Backed",
 };
 
-// Dummy scores data
-const dummyScores = {
-  proj1: {
-    execution_score: 78,
-    classification: "Good Execution",
-    action_directive: "Scale Cautiously",
-    execution_risk_level: "Low",
-    action_summary: "Solid execution foundation with balanced approach to growth and resource management.",
-    team_score: 82,
-    capital_score: 75,
-    speed_score: 70,
-    validation_score: 85,
-    execution_blueprint: {
-      executive_summary: {
-        execution_maturity_tier: "Execution Ready",
-        team_composition: "Balanced team with key roles covered",
-        capital_efficiency: "Good capital efficiency",
-        speed_vs_stability: "Balanced approach",
-        primary_execution_constraint: "Talent acquisition",
-        strategic_insight: "Strong execution capabilities with clear growth path and resource optimization."
-      },
-      reasoning_trace: {
-        stage_2_team: { classification: "High", reasoning: "Well-rounded team with relevant expertise" },
-        stage_3_capital: { classification: "Moderate", reasoning: "Adequate funding for current phase" },
-        stage_4_complexity: { classification: "Medium", reasoning: "Manageable technical complexity" },
-        stage_5_speed: { classification: "Balanced", reasoning: "Good balance between speed and stability" },
-        stage_6_validation: { classification: "High", reasoning: "Strong validation approach" },
-        stage_7_capacity: { classification: "Moderate", reasoning: "Sufficient operational capacity" },
-        stage_8_urgency: { classification: "Medium", reasoning: "Reasonable revenue urgency" },
-        stage_9_scale: { classification: "Moderate", reasoning: "Planned scaling approach" },
-        stage_10_commitment: { classification: "High", reasoning: "Strong team commitment" },
-        stage_11_risks: { "Technical Risk": "Low", "Market Risk": "Low", "Execution Risk": "Moderate" },
-        stage_11_constraint: "Talent acquisition"
-      },
-      scoring_audit: {
-        base_score: 75,
-        pillar_scores: {
-          team_composition: { score: 14, reasoning: "Strong team composition" },
-          capital_efficiency: { score: 13, reasoning: "Good capital utilization" },
-          technical_complexity: { score: 12, reasoning: "Manageable complexity" },
-          speed_vs_stability: { score: 12, reasoning: "Good balance" },
-          validation_approach: { score: 15, reasoning: "Thorough validation" },
-          operational_capacity: { score: 13, reasoning: "Good capacity" },
-          execution_commitment: { score: 14, reasoning: "High commitment" }
-        },
-        final_score: 78
-      },
-      execution_confidence: {
-        overall: "High",
-        team_clarity: 8,
-        capital_adequacy: 7,
-        technical_feasibility: 8,
-        speed_realism: 7,
-        validation_rigor: 8,
-        operational_readiness: 7,
-        commitment_level: 8,
-        reasoning: "Strong execution fundamentals with good team and capital alignment."
-      },
-      execution_architecture: {
-        team_structure: {
-          core_team: ["CEO", "CTO", "Product Manager"],
-          key_hires: ["Lead Engineer", "Marketing Lead", "Sales Lead"],
-          team_gaps: ["Customer Success", "Data Analyst"]
-        },
-        capital_plan: {
-          current_funding: "$150K",
-          runway: "18 months",
-          burn_rate: "$8K/month",
-          next_funding: "Seed round target",
-          allocation: { "Product": "40%", "Marketing": "30%", "Operations": "20%", "G&A": "10%" }
-        },
-        development_approach: {
-          methodology: "Agile with 2-week sprints",
-          tech_stack: "Modern full-stack with microservices",
-          deployment: "Cloud-native with CI/CD",
-          quality_gates: "Automated testing and code reviews"
-        },
-        operational_model: {
-          workflows: "Standardized development workflows",
-          decision_making: "Data-driven with clear RACI",
-          communication: "Daily standups and weekly reviews",
-          reporting: "KPI dashboards and stakeholder updates"
-        },
-        risk_mitigation: {
-          technical_risks: ["Technology debt", "Scalability challenges"],
-          market_risks: ["Competition", "Market changes"],
-          execution_risks: ["Team burnout", "Scope creep"],
-          mitigation_strategies: ["Regular refactoring", "Customer feedback loops", "Team wellness programs", "Clear scope definition"]
-        }
-      },
-      execution_engine: {
-        core_capabilities: [
-          { capability: "Product Development", maturity: "High", description: "Strong product development capabilities" },
-          { capability: "Marketing", maturity: "Medium", description: "Growing marketing function" },
-          { capability: "Sales", maturity: "Early", description: "Sales process being established" },
-          { capability: "Customer Support", maturity: "Medium", description: "Basic support structure in place" }
-        ],
-        resource_allocation: {
-          team_utilization: "85%",
-          capital_efficiency: "Good",
-          time_to_market: "4 weeks for new features",
-          quality_metrics: "95% code coverage, 4.8/5 average rating"
-        },
-        delivery_mechanics: {
-          sprint_cycle: "2 weeks",
-          release_frequency: "Bi-weekly",
-          deployment_process: "Automated CI/CD pipeline",
-          monitoring: "Real-time performance tracking"
-        }
-      }
-    }
-  }
-};
 
 export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: Phase2DashboardProps) {
   const [scores, setScores] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [activeStack, setActiveStack] = useState<string>("option_a");
 
-  useEffect(() => { loadData(); }, [projectId]);
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
 
-  const loadData = async () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const data = dummyScores[projectId as keyof typeof dummyScores];
-      setScores(data);
-      setLoading(false);
-    }, 1000);
-  };
+        if (response.ok) {
+          const data = await response.json();
+          const projectData = data.data;
+
+          console.log('Phase2Dashboard - Raw projectData:', projectData);
+
+          if (projectData.phase2_status === 'not_started') {
+            setScores(null);
+            setLoading(false);
+            return;
+          }
+
+          // Transform data to match expected structure
+          const transformedData = {
+            execution_score: projectData.execution_score,
+            classification: projectData.execution_classification,
+            execution_mode: projectData.execution_mode ||
+              projectData.phase2_analysis?.execution_mode ||
+              projectData.phase2_execution_data?.execution_mode,
+
+            // Pull from execution_confidence
+            build_confidence_overall: projectData.phase2_analysis?.execution_confidence?.overall,
+            team_clarity: projectData.phase2_analysis?.execution_confidence?.team_clarity,
+            capital_adequacy: projectData.phase2_analysis?.execution_confidence?.capital_adequacy,
+
+            // Pull from executive_summary
+            action_directive: projectData.phase2_analysis?.executive_summary?.action_directive,
+            execution_risk_level: projectData.phase2_analysis?.executive_summary?.execution_risk_level,
+            action_summary: projectData.phase2_analysis?.executive_summary?.action_summary,
+            primary_constraint: projectData.phase2_analysis?.executive_summary?.primary_execution_constraint,
+            execution_maturity_tier: projectData.phase2_analysis?.executive_summary?.execution_maturity_tier,
+
+            // Pillar scores
+            team_score: projectData.phase2_analysis?.scoring_audit?.pillar_scores?.team_composition?.score,
+            capital_score: projectData.phase2_analysis?.scoring_audit?.pillar_scores?.capital_efficiency?.score,
+            speed_score: projectData.phase2_analysis?.scoring_audit?.pillar_scores?.speed_vs_stability?.score,
+            validation_score: projectData.phase2_analysis?.scoring_audit?.pillar_scores?.validation_approach?.score,
+
+            // Scoring audit extras
+            final_execution_score: projectData.phase2_analysis?.scoring_audit?.final_score,
+            score_after_caps: projectData.phase2_analysis?.scoring_audit?.score_after_caps,
+            risk_penalty: projectData.phase2_analysis?.scoring_audit?.risk_penalty,
+            maturity_boost: projectData.phase2_analysis?.scoring_audit?.maturity_boost,
+            confidence_index: projectData.phase2_analysis?.scoring_audit?.confidence_index,
+            hard_caps_applied: projectData.phase2_analysis?.scoring_audit?.hard_caps_applied,
+
+            execution_blueprint: projectData.phase2_analysis
+          };
+
+          console.log('Phase2Dashboard - Transformed data:', transformedData);
+          const pillarScores = projectData.phase2_analysis?.scoring_audit?.pillar_scores;
+          console.log('Phase2Dashboard - Pillar scores structure:', pillarScores);
+          console.log('Phase2Dashboard - All pillar scores:', {
+            team_composition: pillarScores?.team_composition?.score,
+            capital_efficiency: pillarScores?.capital_efficiency?.score,
+            technical_complexity: pillarScores?.technical_complexity?.score,
+            speed_vs_stability: pillarScores?.speed_vs_stability?.score,
+            validation_approach: pillarScores?.validation_approach?.score,
+            operational_capacity: pillarScores?.operational_capacity?.score,
+            execution_commitment: pillarScores?.execution_commitment?.score
+          });
+          console.log('Phase2Dashboard - Final scores object:', transformedData);
+          console.log('Phase2Dashboard - Execution score:', transformedData.execution_score);
+          console.log('Phase2Dashboard - Classification:', transformedData.classification);
+          setScores(transformedData);
+        } else {
+          setScores(null);
+        }
+      } catch (error) {
+        console.error('Failed to load Phase 2 dashboard data:', error);
+        setScores(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [projectId]);
 
   const confirmLock = async () => {
-    // Simulate phase locking
-    setTimeout(() => {
-      setShowLockModal(false);
-      toast.success("Phase 2 locked. Navigating to Phase 3...");
-      onLockProceed?.();
-    }, 1000);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}/lock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setShowLockModal(false);
+        toast.success("Phase 2 locked. Navigating to Phase 3...");
+        onLockProceed?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to lock Phase 2");
+      }
+    } catch (error) {
+      console.error('Phase 2 lock error:', error);
+      toast.error("Network error while locking Phase 2");
+    }
   };
 
+  console.log('Phase2Dashboard - Conditional checks:', { loading, scores: !!scores, execution_score: scores?.execution_score });
   if (loading) return <div className="flex justify-center py-16"><div className="h-8 w-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
   if (!scores) return <div className="text-center py-16 text-muted-foreground">No scoring data yet.</div>;
 
@@ -221,31 +205,40 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
   const buildLogic = report.strategic_build_logic || {};
   const productArch = report.product_architecture || {};
   const featurePrio = report.feature_prioritization || {};
-  const teamStruct = report.team_structure || {};
+  const execArch = report.execution_architecture || {};
+  const teamStruct = execArch.team_structure || report.team_structure || {};
   const toolStack = report.tool_stack || {};
   const capitalArch = report.capital_architecture || {};
-  const timeline = report.execution_timeline || [];
+  const timeline = report.execution_timeline || execArch.development_approach?.milestones || [];
   const riskClusters = report.risk_clusters || {};
   const readinessGaps = report.build_readiness_gaps || [];
   const investorSnap = report.investor_snapshot || {};
+  const riskMitigation = execArch.risk_mitigation || {};
+  const executionRoadmap = report.execution_roadmap || {};
   const reasoning = report.reasoning_trace || {};
   const audit = report.scoring_audit || {};
 
-  const layerData = [
-    { layer: "Research", score: Number(scores.research_score), weight: "20%" },
-    { layer: "Scoping", score: Number(scores.scoping_score), weight: "20%" },
-    { layer: "Architecture", score: Number(scores.arch_score), weight: "20%" },
-    { layer: "Resource", score: Number(scores.resource_score), weight: "20%" },
-    { layer: "MVP", score: Number(scores.mvp_score), weight: "20%" },
-  ];
+  const layerData = audit.pillar_scores ? [
+    { layer: "Team", score: Number(audit.pillar_scores.team_composition?.score || 0) * 5, weight: "20%" },
+    { layer: "Capital", score: Number(audit.pillar_scores.capital_efficiency?.score || 0) * 5, weight: "20%" },
+    { layer: "Technical", score: Number(audit.pillar_scores.technical_complexity?.score || 0) * 5, weight: "20%" },
+    { layer: "Validation", score: Number(audit.pillar_scores.validation_approach?.score || 0) * 5, weight: "20%" },
+    { layer: "Commitment", score: Number(audit.pillar_scores.execution_commitment?.score || 0) * 5, weight: "20%" },
+  ] : [];
 
   const pillarData = audit.pillar_scores ? [
-    { name: "Objective Clarity", ...audit.pillar_scores.objective_clarity },
-    { name: "Capacity Alignment", ...audit.pillar_scores.capacity_alignment },
-    { name: "Scope Discipline", ...audit.pillar_scores.scope_discipline },
-    { name: "Capital Sufficiency", ...audit.pillar_scores.capital_sufficiency },
-    { name: "Team Feasibility", ...audit.pillar_scores.team_feasibility },
+    { name: "Team Composition", ...audit.pillar_scores.team_composition },
+    { name: "Capital Efficiency", ...audit.pillar_scores.capital_efficiency },
+    { name: "Technical Complexity", ...audit.pillar_scores.technical_complexity },
+    { name: "Speed vs Stability", ...audit.pillar_scores.speed_vs_stability },
+    { name: "Validation Approach", ...audit.pillar_scores.validation_approach },
+    { name: "Operational Capacity", ...audit.pillar_scores.operational_capacity },
+    { name: "Execution Commitment", ...audit.pillar_scores.execution_commitment },
   ] : [];
+
+  console.log('Phase2Dashboard - Render - scores object:', scores);
+  console.log('Phase2Dashboard - Render - execution_score:', scores?.execution_score);
+  console.log('Phase2Dashboard - Render - classification:', scores?.classification);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -260,7 +253,7 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
         <CardContent className="space-y-4">
           <div className="grid sm:grid-cols-3 gap-3">
             <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 text-center">
-              <p className="text-3xl font-bold text-primary">{Number(scores.execution_score).toFixed(0)}</p>
+              <p className="text-3xl font-bold text-primary">{Number(scores.execution_score || 0).toFixed(0)}</p>
               <p className="text-xs text-muted-foreground mt-1">Execution Score</p>
             </div>
             <div className={`rounded-xl p-4 text-center border ${classColor(scores.classification)}`}>
@@ -271,27 +264,40 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
               <p className="text-xs mt-1 opacity-70">Classification</p>
             </div>
             <div className="rounded-xl bg-accent/5 border border-accent/20 p-4 text-center">
-              <Badge className="mb-1">{modeLabel[scores.execution_mode] || scores.execution_mode}</Badge>
+              <p className="text-lg font-bold text-accent">{scores.execution_mode || "—"}</p>
               <p className="text-xs text-muted-foreground mt-1">Execution Mode</p>
             </div>
           </div>
+
+          {/* Three metric cards */}
           <div className="grid sm:grid-cols-3 gap-3">
             <div className="rounded-lg border p-3 text-center">
-              <p className="text-xl font-bold text-primary">{exec.build_confidence_index || "—"}%</p>
+              <p className="text-xl font-bold text-primary capitalize">
+                {scores.build_confidence_overall || "—"}
+              </p>
               <p className="text-xs text-muted-foreground">Build Confidence</p>
-              {(exec.confidence_classification || audit.confidence_index) && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${tierColor(exec.confidence_classification || audit.confidence_index)}`}>
-                  {exec.confidence_classification || audit.confidence_index}
+              {scores.execution_maturity_tier && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${tierColor(scores.execution_maturity_tier)}`}>
+                  {scores.execution_maturity_tier}
                 </span>
               )}
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(exec.capital_intensity_tier)}`}>{exec.capital_intensity_tier || "—"}</span>
-              <p className="text-xs text-muted-foreground mt-1">Capital Intensity</p>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityColor(scores.execution_risk_level || "")}`}>
+                {scores.execution_risk_level || "—"}
+              </span>
+              <p className="text-xs text-muted-foreground mt-1">Execution Risk</p>
             </div>
             <div className="rounded-lg border p-3 text-center">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(exec.complexity_tier)}`}>{exec.complexity_tier || "—"}</span>
-              <p className="text-xs text-muted-foreground mt-1">Complexity</p>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColor(scores.primary_constraint || "")}`}>
+                {scores.primary_constraint ? "Identified" : "—"}
+              </span>
+              <p className="text-xs text-muted-foreground mt-1">Primary Constraint</p>
+              {scores.primary_constraint && (
+                <p className="text-[10px] text-muted-foreground mt-1 truncate" title={scores.primary_constraint}>
+                  {scores.primary_constraint}
+                </p>
+              )}
             </div>
           </div>
           {exec.strategic_insight && (
@@ -311,100 +317,145 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Stage 2: Build Objective */}
-            {reasoning.stage_2_objective && (
+
+            {/* Stage 2: Team */}
+            {reasoning.stage_2_team && (
               <div className="rounded-lg border p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Crosshair className="h-3.5 w-3.5 text-primary" />
-                  <p className="text-xs font-semibold">Build Objective</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ml-auto ${tierColor(reasoning.stage_2_objective.classification)}`}>
-                    {reasoning.stage_2_objective.classification}
+                  <Users className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold">Team Assessment</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ml-auto ${tierColor(reasoning.stage_2_team.classification)}`}>
+                    {reasoning.stage_2_team.classification}
                   </span>
                 </div>
-                {reasoning.stage_2_objective.rationale && <p className="text-xs text-muted-foreground mt-1">{reasoning.stage_2_objective.rationale}</p>}
+                {reasoning.stage_2_team.reasoning && (
+                  <p className="text-xs text-muted-foreground mt-1">{reasoning.stage_2_team.reasoning}</p>
+                )}
               </div>
             )}
 
-            {/* Stage 3: Capacity vs Ambition */}
-            {reasoning.stage_3_capacity_gap && (
+            {/* Stage 3: Capital */}
+            {reasoning.stage_3_capital && (
               <div className="rounded-lg border p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Scale className="h-3.5 w-3.5 text-amber-600" />
-                  <p className="text-xs font-semibold">Capacity vs Ambition</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ml-auto ${tierColor(reasoning.stage_3_capacity_gap.classification)}`}>
-                    {reasoning.stage_3_capacity_gap.classification}
+                  <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+                  <p className="text-xs font-semibold">Capital Structure</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ml-auto ${tierColor(reasoning.stage_3_capital.classification)}`}>
+                    {reasoning.stage_3_capital.classification}
                   </span>
                 </div>
-                {reasoning.stage_3_capacity_gap.gap_detail && <p className="text-xs text-muted-foreground mt-1">{reasoning.stage_3_capacity_gap.gap_detail}</p>}
+                {reasoning.stage_3_capital.reasoning && (
+                  <p className="text-xs text-muted-foreground mt-1">{reasoning.stage_3_capital.reasoning}</p>
+                )}
               </div>
             )}
 
-            {/* Stages 4-8 summary grid */}
+            {/* Stages 4-10 summary grid */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {reasoning.stage_4_capital && (
+              {reasoning.stage_4_complexity && (
                 <div className="rounded-lg border p-2.5">
-                  <p className="text-[10px] text-muted-foreground mb-1">Capital Structure</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_4_capital.classification)}`}>
-                    {reasoning.stage_4_capital.classification}
+                  <p className="text-[10px] text-muted-foreground mb-1">Technical Complexity</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_4_complexity.classification)}`}>
+                    {reasoning.stage_4_complexity.classification}
                   </span>
+                  {reasoning.stage_4_complexity.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_4_complexity.reasoning}</p>
+                  )}
                 </div>
               )}
-              {reasoning.stage_5_team && (
+              {reasoning.stage_5_speed && (
                 <div className="rounded-lg border p-2.5">
-                  <p className="text-[10px] text-muted-foreground mb-1">Team Feasibility</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_5_team.classification)}`}>
-                    {reasoning.stage_5_team.classification}
+                  <p className="text-[10px] text-muted-foreground mb-1">Speed vs Stability</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_5_speed.classification)}`}>
+                    {reasoning.stage_5_speed.classification}
                   </span>
+                  {reasoning.stage_5_speed.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_5_speed.reasoning}</p>
+                  )}
                 </div>
               )}
-              {reasoning.stage_7_architecture && (
+              {reasoning.stage_6_validation && (
                 <div className="rounded-lg border p-2.5">
-                  <p className="text-[10px] text-muted-foreground mb-1">Architecture Tier</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_7_architecture.tier)}`}>
-                    {reasoning.stage_7_architecture.tier}
+                  <p className="text-[10px] text-muted-foreground mb-1">Validation Approach</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_6_validation.classification)}`}>
+                    {reasoning.stage_6_validation.classification}
                   </span>
+                  {reasoning.stage_6_validation.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_6_validation.reasoning}</p>
+                  )}
                 </div>
               )}
-              {reasoning.stage_8_timeline && (
+              {reasoning.stage_7_capacity && (
                 <div className="rounded-lg border p-2.5">
-                  <p className="text-[10px] text-muted-foreground mb-1">Timeline Realism</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_8_timeline.classification)}`}>
-                    {reasoning.stage_8_timeline.classification}
+                  <p className="text-[10px] text-muted-foreground mb-1">Operational Capacity</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_7_capacity.classification)}`}>
+                    {reasoning.stage_7_capacity.classification}
                   </span>
+                  {reasoning.stage_7_capacity.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_7_capacity.reasoning}</p>
+                  )}
                 </div>
               )}
-              {reasoning.stage_10_maturity && (
+              {reasoning.stage_8_urgency && (
                 <div className="rounded-lg border p-2.5">
-                  <p className="text-[10px] text-muted-foreground mb-1">Execution Maturity</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_10_maturity.tier)}`}>
-                    {reasoning.stage_10_maturity.tier}
+                  <p className="text-[10px] text-muted-foreground mb-1">Revenue Urgency</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_8_urgency.classification)}`}>
+                    {reasoning.stage_8_urgency.classification}
                   </span>
+                  {reasoning.stage_8_urgency.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_8_urgency.reasoning}</p>
+                  )}
                 </div>
               )}
-              {reasoning.stage_9_risks && (
+              {reasoning.stage_9_scale && (
                 <div className="rounded-lg border p-2.5">
-                  <p className="text-[10px] text-muted-foreground mb-1">High Risk Clusters</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${reasoning.stage_9_risks.high_risk_count >= 3 ? "bg-red-100 text-red-800" : reasoning.stage_9_risks.high_risk_count >= 1 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}>
-                    {reasoning.stage_9_risks.high_risk_count} of 5
+                  <p className="text-[10px] text-muted-foreground mb-1">Scalability Intent</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_9_scale.classification)}`}>
+                    {reasoning.stage_9_scale.classification}
                   </span>
+                  {reasoning.stage_9_scale.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_9_scale.reasoning}</p>
+                  )}
+                </div>
+              )}
+              {reasoning.stage_10_commitment && (
+                <div className="rounded-lg border p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-1">Execution Commitment</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tierColor(reasoning.stage_10_commitment.classification)}`}>
+                    {reasoning.stage_10_commitment.classification}
+                  </span>
+                  {reasoning.stage_10_commitment.reasoning && (
+                    <p className="text-[10px] text-muted-foreground mt-1">{reasoning.stage_10_commitment.reasoning}</p>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Scope compression / MVES */}
-            {reasoning.stage_6_scope?.mves_definition && (
-              <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
-                <p className="text-xs font-semibold text-primary mb-1">Minimum Viable Execution Scope (MVES)</p>
-                <p className="text-xs text-muted-foreground">{reasoning.stage_6_scope.mves_definition}</p>
-                {reasoning.stage_6_scope.scope_compression_applied && (
-                  <Badge variant="outline" className="text-[9px] mt-2 border-amber-300 text-amber-700">Scope Compression Applied</Badge>
-                )}
+            {/* Stage 11: Risk levels */}
+            {reasoning.stage_11_risks && (
+              <div className="rounded-lg bg-muted/30 border p-3">
+                <p className="text-xs font-semibold mb-2">Risk Assessment</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(reasoning.stage_11_risks).map(([key, val]) => (
+                    <span key={key} className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${severityColor(String(val))}`}>
+                      {key}: {String(val)}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* Stage 11: Primary constraint */}
+            {reasoning.stage_11_constraint && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                <p className="text-xs font-semibold text-red-700 mb-1">Primary Execution Constraint</p>
+                <p className="text-xs text-red-800">{reasoning.stage_11_constraint}</p>
+              </div>
+            )}
+
           </CardContent>
         </Card>
       )}
-
       {/* ========== SCORING DECISION AUDIT ========== */}
       {pillarData.length > 0 && (
         <Card className="border border-indigo-200">
@@ -442,11 +493,15 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
                 <p className="text-[10px] text-muted-foreground">Base Score</p>
               </div>
               <div className="rounded-lg border p-3 text-center">
-                <p className="text-lg font-bold text-amber-600">{audit.score_after_caps}</p>
+                <p className="text-lg font-bold text-amber-600">
+                  {audit.score_after_caps ?? (audit.base_score - (audit.risk_penalty || 0))}
+                </p>
                 <p className="text-[10px] text-muted-foreground">After Caps</p>
               </div>
               <div className="rounded-lg border p-3 text-center">
-                <p className="text-lg font-bold text-destructive">{audit.risk_penalty ? `-${audit.risk_penalty}` : "0"}</p>
+                <p className="text-lg font-bold text-destructive">
+                  {audit.risk_penalty ? `-${audit.risk_penalty}` : "0"}
+                </p>
                 <p className="text-[10px] text-muted-foreground">Risk Penalty</p>
               </div>
               <div className="rounded-lg border p-3 text-center">
@@ -471,12 +526,18 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
             <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Final Execution Score</p>
-                <p className="text-2xl font-bold text-primary">{audit.final_execution_score}</p>
+                <p className="text-2xl font-bold text-primary">
+                  {audit.final_score || audit.final_execution_score || scores.execution_score || "—"}
+                </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Confidence Index</p>
-                <span className={`text-sm font-bold px-3 py-1 rounded-full ${tierColor(audit.confidence_index)}`}>
-                  {audit.confidence_index}
+                <p className="text-xs text-muted-foreground">Confidence</p>
+                <span className={`text-sm font-bold px-3 py-1 rounded-full capitalize ${scores.build_confidence_overall === "low" ? "bg-red-100 text-red-800" :
+                    scores.build_confidence_overall === "moderate" ? "bg-amber-100 text-amber-800" :
+                      scores.build_confidence_overall === "high" ? "bg-green-100 text-green-800" :
+                        "bg-muted text-muted-foreground"
+                  }`}>
+                  {scores.build_confidence_overall || "—"}
                 </span>
               </div>
             </div>
@@ -737,34 +798,43 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
       )}
 
       {/* ========== 6. TEAM STRUCTURE ========== */}
-      {teamStruct.roles?.length > 0 && (
+      {(execArch.team_structure?.core_team?.length > 0 || execArch.team_structure?.key_hires?.length > 0) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="h-4 w-4 text-primary" /> Team Structure Model
-              {teamStruct.total_monthly_burn > 0 && (
-                <span className="text-xs text-muted-foreground ml-auto font-normal">Monthly burn: <strong className="text-primary">{fmt(teamStruct.total_monthly_burn)}</strong></span>
-              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid sm:grid-cols-2 gap-3">
-              {teamStruct.roles.map((r: any, i: number) => (
-                <div key={i} className="rounded-lg border p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold">{r.title} <span className="text-muted-foreground font-normal">×{r.count}</span></p>
-                    {r.cost_monthly > 0 && <span className="text-xs font-medium text-primary">{fmt(r.cost_monthly)}/mo</span>}
-                  </div>
-                  {r.why_needed && <p className="text-xs text-muted-foreground">{r.why_needed}</p>}
-                  <div className="flex gap-2 mt-2">
-                    {r.when_needed && <Badge variant="outline" className="text-[9px]">{r.when_needed}</Badge>}
-                    {r.commitment && <Badge variant="outline" className="text-[9px]">{r.commitment}</Badge>}
-                  </div>
+            {execArch.team_structure?.core_team?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-primary mb-2">Core Team</p>
+                <div className="flex flex-wrap gap-2">
+                  {execArch.team_structure.core_team.map((r: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-xs">{r}</Badge>
+                  ))}
                 </div>
-              ))}
-            </div>
-            {teamStruct.hiring_sequence_note && (
-              <p className="text-sm text-muted-foreground border-l-2 border-primary/30 pl-3">{teamStruct.hiring_sequence_note}</p>
+              </div>
+            )}
+            {execArch.team_structure?.key_hires?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-amber-600 mb-2">Key Hires Needed</p>
+                <div className="flex flex-wrap gap-2">
+                  {execArch.team_structure.key_hires.map((r: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-xs border-amber-300 text-amber-700">{r}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {execArch.team_structure?.team_gaps?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-destructive mb-2">Team Gaps</p>
+                <div className="flex flex-wrap gap-2">
+                  {execArch.team_structure.team_gaps.map((g: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-xs border-red-300 text-red-700">{g}</Badge>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -819,42 +889,71 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { label: "Build Capital", value: capitalArch.build_capital || scores.budget_realistic },
-              { label: "6mo Runway", value: capitalArch.runway_capital_6m },
-              { label: "12mo Runway", value: capitalArch.runway_capital_12m },
-              { label: "Marketing", value: capitalArch.marketing_capital },
-              { label: "Buffer", value: capitalArch.buffer_capital },
-              { label: "Risk Capital", value: capitalArch.risk_capital },
-            ].map((item) => item.value ? (
-              <div key={item.label} className="rounded-lg border p-3 text-center">
-                <p className="text-lg font-bold text-primary">{fmt(item.value)}</p>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-              </div>
-            ) : null)}
-          </div>
-          {capitalArch.total_12m > 0 && (
-            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-center">
-              <p className="text-2xl font-bold text-primary">{fmt(capitalArch.total_12m)}</p>
-              <p className="text-xs text-muted-foreground">Total 12-Month Capital Requirement</p>
-            </div>
-          )}
-          {capitalArch.breakeven_sensitivity && (
-            <p className="text-sm text-muted-foreground border-l-2 border-green-200 pl-3">{capitalArch.breakeven_sensitivity}</p>
-          )}
-          {!capitalArch.build_capital && (
+          {/* Show capital plan from execution_architecture if available */}
+          {(() => {
+            const capitalPlan = report.execution_architecture?.capital_plan;
+            if (!capitalPlan && !capitalArch.build_capital) return null;
+
+            const plan = capitalPlan || {};
+            return (
+              <>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {plan.current_funding && (
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Current Funding</p>
+                      <p className="text-sm font-semibold text-primary">{plan.current_funding}</p>
+                    </div>
+                  )}
+                  {plan.runway && (
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Runway</p>
+                      <p className="text-sm font-semibold">{plan.runway}</p>
+                    </div>
+                  )}
+                  {plan.burn_rate && (
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Burn Rate</p>
+                      <p className="text-sm font-semibold">{plan.burn_rate}</p>
+                    </div>
+                  )}
+                  {plan.next_funding && (
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Next Funding Needed</p>
+                      <p className="text-sm font-semibold text-accent">{plan.next_funding}</p>
+                    </div>
+                  )}
+                </div>
+
+                {plan.allocation && Object.keys(plan.allocation).length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-2">Capital Allocation</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {Object.entries(plan.allocation).map(([key, val]) => (
+                        <div key={key} className="rounded-lg border p-2 text-center">
+                          <p className="text-sm font-bold text-primary">{String(val)}</p>
+                          <p className="text-[10px] text-muted-foreground">{key}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
+          {/* Fallback numeric display if capitalArch has numeric values */}
+          {!report.execution_architecture?.capital_plan && (
             <div className="grid sm:grid-cols-3 gap-3">
               <div className="rounded-lg border p-3 text-center">
-                <p className="text-lg font-bold">{fmt(scores.budget_best)}</p>
+                <p className="text-lg font-bold">{fmt(scores.budget_best) !== "$0" ? fmt(scores.budget_best) : "—"}</p>
                 <p className="text-xs text-muted-foreground">Best Case</p>
               </div>
               <div className="rounded-lg border border-accent/20 p-3 text-center">
-                <p className="text-lg font-bold text-accent">{fmt(scores.budget_realistic)}</p>
+                <p className="text-lg font-bold text-accent">{fmt(scores.budget_realistic) !== "$0" ? fmt(scores.budget_realistic) : "—"}</p>
                 <p className="text-xs text-muted-foreground">Realistic</p>
               </div>
               <div className="rounded-lg border p-3 text-center">
-                <p className="text-lg font-bold text-destructive">{fmt(scores.budget_risk)}</p>
+                <p className="text-lg font-bold text-destructive">{fmt(scores.budget_risk) !== "$0" ? fmt(scores.budget_risk) : "—"}</p>
                 <p className="text-xs text-muted-foreground">Risk Case</p>
               </div>
             </div>
@@ -868,7 +967,6 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" /> Execution Timeline Model
-              <span className="text-xs text-muted-foreground ml-auto font-normal">{Number(scores.timeline_min_weeks).toFixed(0)}–{Number(scores.timeline_max_weeks).toFixed(0)} weeks + {Number(scores.timeline_buffer_weeks).toFixed(0)}w buffer</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -876,8 +974,8 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
               {timeline.map((p: any, i: number) => (
                 <div key={i} className="rounded-lg border p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-semibold">{p.phase}</h5>
-                    <Badge variant="outline" className="text-xs">{p.weeks}</Badge>
+                    <h5 className="text-sm font-semibold">{p.phase || p.title || `Milestone ${i + 1}`}</h5>
+                    <Badge variant="outline" className="text-xs">{p.weeks || p.timeline}</Badge>
                   </div>
                   {p.deliverables?.length > 0 && (
                     <ul className="space-y-1 mb-2">
@@ -888,21 +986,72 @@ export default function Phase2Dashboard({ projectId, onRerun, onLockProceed }: P
                       ))}
                     </ul>
                   )}
-                  <div className="flex flex-wrap gap-3 text-[10px]">
-                    {p.validation_milestone && (
-                      <span className="bg-primary/5 text-primary px-2 py-0.5 rounded-full">
-                        🎯 {p.validation_milestone}
-                      </span>
-                    )}
-                    {p.go_no_go && (
-                      <span className="bg-accent/5 text-accent px-2 py-0.5 rounded-full">
-                        ✅ {p.go_no_go}
-                      </span>
-                    )}
-                  </div>
+                  {p.resources && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <span className="font-medium">Resources:</span> {p.resources}
+                    </p>
+                  )}
+                  {(p.validation_milestone || p.go_no_go) && (
+                    <div className="flex flex-wrap gap-3 text-[10px] mt-2">
+                      {p.validation_milestone && (
+                        <span className="bg-primary/5 text-primary px-2 py-0.5 rounded-full">🎯 {p.validation_milestone}</span>
+                      )}
+                      {p.go_no_go && (
+                        <span className="bg-accent/5 text-accent px-2 py-0.5 rounded-full">✅ {p.go_no_go}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== EXECUTION ROADMAP ========== */}
+      {(executionRoadmap.immediate_actions?.length > 0 || executionRoadmap.critical_milestones?.length > 0) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Rocket className="h-4 w-4 text-primary" /> Execution Roadmap
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {executionRoadmap.immediate_actions?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold mb-2">Immediate Actions</p>
+                <div className="space-y-2">
+                  {executionRoadmap.immediate_actions.map((a: any, i: number) => (
+                    <div key={i} className="rounded-lg border p-3 flex items-start gap-3">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 border ${severityColor(a.priority === "Critical" ? "high" : "moderate")}`}>
+                        {a.priority}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{a.action}</p>
+                        <div className="flex gap-3 mt-1">
+                          {a.timeline && <span className="text-[10px] text-muted-foreground">⏱ {a.timeline}</span>}
+                          {a.owner && <span className="text-[10px] text-muted-foreground">👤 {a.owner}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {executionRoadmap.critical_milestones?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold mb-2">Critical Milestones</p>
+                <div className="space-y-2">
+                  {executionRoadmap.critical_milestones.map((m: any, i: number) => (
+                    <div key={i} className="rounded-lg border p-3">
+                      <p className="text-sm font-semibold">{m.milestone}</p>
+                      {m.success_criteria && <p className="text-xs text-muted-foreground mt-1">✅ {m.success_criteria}</p>}
+                      {m.deadline && <p className="text-xs text-primary mt-1">📅 {m.deadline}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

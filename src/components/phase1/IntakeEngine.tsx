@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Bot, User, Loader2, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 import { saveIntakeProgress, loadIntakeProgress, clearIntakeProgress } from "@/lib/intake-autosave";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -34,20 +35,6 @@ export default function IntakeEngine({ projectId, onIntakeComplete }: IntakeEngi
   const [completedAreas, setCompletedAreas] = useState<number>(0);
   const [sendingBlocked, setSendingBlocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  // Dummy AI responses for simulation
-  const dummyResponses = [
-    "I understand you're ready to validate your venture idea. Let me help you evaluate your concept across 10 critical areas. First, tell me about your core idea and what problem it solves.",
-    "That's helpful. Now let's discuss your target customers. Who exactly are you building this for and what makes them a good fit?",
-    "Good context. What's the urgency of this problem? How painful is it for your target customers right now?",
-    "Thanks for sharing. What solutions are people currently using for this problem? How are they coping without your solution?",
-    "Interesting. Let's talk about how you'll make money. What's your revenue model and pricing strategy?",
-    "Important details. What's the market size and growth potential for this opportunity?",
-    "Got it. How does your solution stand out from competitors? What makes you uniquely positioned to win?",
-    "Great to know. What's your team's background and expertise that gives you an advantage here?",
-    "Thanks for that. What are the key assumptions you're making about your business model and market?",
-    "Final question - what evidence do you have that validates your assumptions? Any early traction or customer feedback?",
-    "<INTAKE_COMPLETE>{\"idea_description\":\"AI-powered productivity platform\",\"problem_statement\":\"Remote teams struggle with communication\",\"target_users\":\"Remote workers and team managers\",\"target_market\":\"SMB productivity tools\",\"monetization_model\":\"SaaS subscription\",\"founder_background\":\"Tech industry veterans\",\"core_assumptions\":\"Remote work is permanent\",\"follow_up_responses\":{\"market_size\":\"Large\"}}</INTAKE_COMPLETE>"
-  ];
 
   // Restore saved progress on mount
   useEffect(() => {
@@ -71,14 +58,6 @@ export default function IntakeEngine({ projectId, onIntakeComplete }: IntakeEngi
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Estimate progress based on message count (heuristic)
-  useEffect(() => {
-    const userMsgCount = messages.filter(m => m.role === "user").length;
-    // Rough: each user response covers ~1 area, first response covers ~2
-    const estimated = Math.min(10, userMsgCount > 0 ? Math.min(userMsgCount + 1, 10) : 0);
-    setCompletedAreas(estimated);
-  }, [messages]);
-
   const startIntake = async () => {
     setStarted(true);
     const userMsg: Message = { role: "user", content: "I want to validate my venture idea." };
@@ -89,41 +68,99 @@ export default function IntakeEngine({ projectId, onIntakeComplete }: IntakeEngi
   const streamResponse = async (msgs: Message[]) => {
     setIsLoading(true);
     
-    // Simulate AI response based on message count
-    const userMsgCount = msgs.filter(m => m.role === "user").length;
-    const responseIndex = Math.min(userMsgCount - 1, dummyResponses.length - 1);
-    const responseText = dummyResponses[Math.max(0, responseIndex)];
-    
-    // Simulate streaming effect
-    let currentText = "";
-    const words = responseText.split(' ');
-    
-    for (let i = 0; i < words.length; i++) {
-      currentText += (i > 0 ? ' ' : '') + words[i];
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
-        }
-        return [...prev, { role: "assistant", content: currentText }];
+    try {
+      const token = localStorage.getItem('token');
+      const userMsgCount = msgs.filter(m => m.role === "user").length;
+      
+      // Call AI API for intelligent response
+      const response = await fetch(`${API_BASE_URL}/ai/intake-chat`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          // Send the full conversation as structured messages, not just a flattened string
+          conversation: msgs.map(m => `${m.role === 'user' ? 'FOUNDER' : 'ADVISOR'}: ${m.content}`).join('\n\n'),
+          message_count: userMsgCount,
+          project_id: projectId
+        })
       });
-      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-    }
 
-    // Check for intake completion
-    if (currentText.includes("<INTAKE_COMPLETE>")) {
-      const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
-      if (match) {
-        try {
-          const intakeData = JSON.parse(match[1]);
-          setCompletedAreas(10);
-          clearIntakeProgress(projectId, "phase1");
-          toast.success("Intake complete! Ready for scoring engine.");
-          onIntakeComplete(intakeData);
-        } catch (e) {
-          console.error("Failed to parse intake data:", e);
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      const responseText = data.data?.response;
+      
+      if (!responseText) {
+        throw new Error('Empty AI response received');
+      }
+      
+      // Simulate streaming effect
+      let currentText = "";
+      const words = responseText.split(' ');
+      
+      for (let i = 0; i < words.length; i++) {
+        currentText += (i > 0 ? ' ' : '') + words[i];
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
+          }
+          return [...prev, { role: "assistant", content: currentText }];
+        });
+        await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 50));
+      }
+
+      // Parse area completion signal
+      const areaMatch = currentText.match(/<AREA_COMPLETE:(\d+)>/);
+      if (areaMatch) {
+        const completedArea = parseInt(areaMatch[1]);
+        setCompletedAreas(prev => Math.max(prev, completedArea));
+      }
+
+      // Strip the signal from the displayed message
+      setMessages(prev =>
+        prev.map((m, idx) =>
+          idx === prev.length - 1
+            ? { ...m, content: m.content.replace(/<AREA_COMPLETE:\d+>/g, "").trim() }
+            : m
+        )
+      );
+
+      // Check for intake completion
+      if (currentText.includes("<INTAKE_COMPLETE>")) {
+        const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
+        if (match) {
+          try {
+            const intakeData = JSON.parse(match[1]);
+            setCompletedAreas(10);
+            clearIntakeProgress(projectId, "phase1");
+            toast.success("Intake complete! Ready for scoring engine.");
+            onIntakeComplete(intakeData);
+          } catch (e) {
+            console.error("Failed to parse intake data:", e);
+          }
         }
       }
+      
+      // Check for summary message (after Question 10, before completion)
+      const currentUserMsgCount = msgs.filter(m => m.role === "user").length;
+      if (currentUserMsgCount === 11 && currentText.includes("Thank you for completing") && !currentText.includes("<INTAKE_COMPLETE>")) {
+        // AI has provided summary, waiting for user to type "proceed"
+        // This is handled automatically by the message display
+        console.log("AI provided summary, waiting for user to type 'proceed'");
+      }
+    } catch (error) {
+      console.error('AI response error:', error);
+      
+      // Fallback to a simple error message
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "I'm having trouble connecting right now. Please try again in a moment." 
+      }]);
     }
     
     setIsLoading(false);
@@ -206,7 +243,7 @@ export default function IntakeEngine({ projectId, onIntakeComplete }: IntakeEngi
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-muted/30 rounded-xl">
+      <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-muted/30 rounded-xl scrollbar-hide">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "assistant" && (
@@ -220,7 +257,10 @@ export default function IntakeEngine({ projectId, onIntakeComplete }: IntakeEngi
                 : "bg-card border border-border"
             }`}>
               {msg.role === "assistant"
-                ? msg.content.replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "").trim()
+                ? msg.content
+                    .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
+                    .replace(/<AREA_COMPLETE:\d+>/g, "")
+                    .trim()
                 : msg.content}
             </div>
             {msg.role === "user" && (

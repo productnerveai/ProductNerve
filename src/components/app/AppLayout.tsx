@@ -52,9 +52,9 @@ export default function AppLayout() {
                   <DropdownMenuItem onClick={() => navigate("/app/settings?tab=workspaces")}>
                     <Building2 className="h-4 w-4 mr-2" /> Workspace Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/app/billing")}>
+                  {/* <DropdownMenuItem onClick={() => navigate("/app/billing")}>
                     <CreditCard className="h-4 w-4 mr-2" /> Billing & Subscription
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> */}
                   <DropdownMenuItem onClick={() => navigate("/app/settings?tab=notifications")}>
                     <Bell className="h-4 w-4 mr-2" /> Notification Settings
                   </DropdownMenuItem>

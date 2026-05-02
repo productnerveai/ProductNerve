@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import ScoringProgressUI from "@/components/shared/ScoringProgressUI";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase2ScoringProps {
   projectId: string;
   executionMode: string;
-  onScoringComplete: () => void;
+  onScoringComplete: (scoreData: any) => void; // pass score data up
 }
 
 export default function Phase2Scoring({ projectId, executionMode, onScoringComplete }: Phase2ScoringProps) {
@@ -24,7 +26,6 @@ export default function Phase2Scoring({ projectId, executionMode, onScoringCompl
   }, []);
 
   const runScoring = async (currentRetryCount: number) => {
-    // Simulate rate limiting (allow max 3 retries)
     if (currentRetryCount >= 3) {
       toast.error("Maximum retry attempts reached.");
       setShowRetry(true);
@@ -38,41 +39,58 @@ export default function Phase2Scoring({ projectId, executionMode, onScoringCompl
     setRetryCount(currentRetryCount);
 
     try {
-      // Simulate scoring process with progress
-      const scoringSteps = [
-        "Analyzing team composition and capabilities...",
-        "Evaluating capital structure and runway...",
-        "Assessing technical complexity and feasibility...",
-        "Reviewing speed vs stability trade-offs...",
-        "Calculating execution readiness score..."
-      ];
+      // Retrieve intake data from localStorage (saved by Phase2IntakeEngine via autosave)
+      // OR pass it as a prop — see Phase2Container fix below
+      const token = localStorage.getItem('token');
 
-      for (let i = 0; i < scoringSteps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-        // Could update progress UI here if needed
+      // First fetch current phase2 data to get intake_data
+      const stateRes = await fetch(`${API_BASE_URL}/validation/phase2/${projectId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!stateRes.ok) throw new Error('Failed to fetch phase 2 state');
+      const stateData = await stateRes.json();
+      const intakeData = stateData.data?.intake_data;
+
+      if (!intakeData) throw new Error('Intake data not found. Please complete the intake first.');
+
+      // Now call the scoring API
+      const response = await fetch(`${API_BASE_URL}/validation/phase2-score`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          intake_data: intakeData,
+          execution_mode: executionMode,
+          project_id: projectId
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Scoring API failed');
       }
 
-      // Simulate occasional failure for demo purposes
-      if (Math.random() < 0.2 && currentRetryCount < 2) {
-        throw new Error("Simulated scoring error");
-      }
-
+      const data = await response.json();
       setIsComplete(true);
       toast.success("Execution analysis complete!");
-      onScoringComplete();
+      onScoringComplete(data.data);
+
     } catch (e: any) {
       console.error("Phase 2 scoring error:", e);
       setShowRetry(true);
       setRegenAllowed(currentRetryCount < 2);
-      toast.error("Analysis encountered an issue. You can retry or proceed.");
+      toast.error(e.message || "Analysis encountered an issue. You can retry.");
+    } finally {
+      setIsScoring(false);
     }
-    setIsScoring(false);
   };
 
   const handleRetry = () => {
     if (!regenAllowed) {
       toast.error("Regeneration limit reached for this phase.");
-      setRegenAllowed(false);
       return;
     }
     runScoring(retryCount + 1);

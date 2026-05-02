@@ -101,14 +101,14 @@ export default function AppSidebar() {
               </SidebarMenuItem>
               )}
 
-              <SidebarMenuItem>
+              {/* <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location.pathname === "/app/billing"}>
                   <Link to="/app/billing">
                     <CreditCard className="h-4 w-4" />
                     <span>Billing</span>
                   </Link>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
+              </SidebarMenuItem> */}
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location.pathname === "/app/settings"}>

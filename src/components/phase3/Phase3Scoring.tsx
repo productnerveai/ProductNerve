@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import ScoringProgressUI from "@/components/shared/ScoringProgressUI";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase3ScoringProps {
   projectId: string;
   onScoringComplete: () => void;
@@ -37,26 +39,46 @@ export default function Phase3Scoring({ projectId, onScoringComplete }: Phase3Sc
     setRetryCount(currentRetryCount);
 
     try {
-      // Simulate scoring process with progress
-      const scoringSteps = [
-        "Analyzing market entry strategy...",
-        "Evaluating organizational design...", 
-        "Assessing demand generation...",
-        "Reviewing conversion architecture...",
-        "Calculating scale readiness...",
-        "Finalizing growth economics..."
-      ];
+      // Get intake data from parent component or fetch from backend
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-      for (let i = 0; i < scoringSteps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-        // Could update progress UI here if needed
+      if (!response.ok) {
+        throw new Error('Failed to fetch Phase 3 data');
       }
 
-      // Simulate occasional failure for demo purposes
-      if (Math.random() < 0.2 && currentRetryCount < 2) {
-        throw new Error("Simulated scoring error");
+      const data = await response.json();
+      const projectData = data.data;
+
+      if (!projectData.intake_complete || !projectData.intake_data) {
+        throw new Error('Intake data is required for scoring');
       }
 
+      // Call real AI scoring service
+      const scoringResponse = await fetch(`${API_BASE_URL}/validation/phase3-score`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          project_id: projectId,
+          intake_data: projectData.intake_data,
+          growth_mode: projectData.growth_mode || 'structured_growth'
+        })
+      });
+
+      if (!scoringResponse.ok) {
+        const error = await scoringResponse.json();
+        throw new Error(error.error || 'Scoring failed');
+      }
+
+      const scoringData = await scoringResponse.json();
+      
       setIsComplete(true);
       toast.success("Growth analysis complete!");
       onScoringComplete();

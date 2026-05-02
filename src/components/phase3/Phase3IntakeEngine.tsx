@@ -5,6 +5,8 @@ import { Send, Bot, User, Loader2, CheckCircle2, Circle, Rocket } from "lucide-r
 import { toast } from "sonner";
 import { saveIntakeProgress, loadIntakeProgress, clearIntakeProgress } from "@/lib/intake-autosave";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -39,25 +41,6 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
   const [completedAreas, setCompletedAreas] = useState<number>(0);
   const [sendingBlocked, setSendingBlocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  // Dummy AI responses for simulation
-  const dummyResponses = [
-    "I understand you're ready to design your GTM strategy. Let me help you build a comprehensive growth blueprint across 15 critical areas. First, tell me about your ideal customer profile.",
-    "That's helpful. What's the specific buying trigger that makes customers seek out your solution?",
-    "Good context. How do customers currently discover and evaluate solutions like yours?",
-    "Thanks for sharing. What distribution channels do you have access to or plan to use?",
-    "Important details. How do you plan to generate revenue from your customers?",
-    "Got it. What's your pricing hypothesis and how did you arrive at it?",
-    "Great to know. What's your sales motion - how do customers move from awareness to purchase?",
-    "Thanks for that. How quickly do customers realize value after starting with your solution?",
-    "Good context. What keeps customers coming back and using your solution over time?",
-    "Interesting. What gives you a sustainable competitive advantage in the market?",
-    "Thanks for sharing. Which channels will be most effective for reaching your customers?",
-    "Important details. What's your estimated customer acquisition cost and how did you calculate it?",
-    "Got it. What are your growth targets for the next 12-24 months?",
-    "Great to know. How much capital do you need to execute your GTM strategy effectively?",
-    "Final question - are you building for rapid scale or controlled, sustainable growth?",
-    "<INTAKE_COMPLETE>{\"icp_profile\":{\"demographic\":\"Tech professionals 25-45\",\"buying_trigger\":\"Productivity needs\"},\"distribution_access\":[\"SEO\",\"Content\"],\"revenue_model\":\"SaaS\",\"pricing_hypothesis\":\"Tiered pricing\",\"sales_motion\":\"Self-serve with enterprise upsell\",\"time_to_value\":\"7 days\",\"retention_logic\":\"Network effects\",\"competitive_edge\":\"Superior UX\",\"channel_strategy\":[\"SEO\",\"Paid Social\"],\"cac_estimate\":\"$75-125\",\"growth_target\":\"10K users in 12 months\",\"gtm_capital\":\"$250K\",\"scale_intent\":\"Aggressive\"}</INTAKE_COMPLETE>"
-  ];
 
   useEffect(() => {
     const saved = loadIntakeProgress(projectId, "phase3");
@@ -95,44 +78,92 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
   const streamResponse = async (msgs: Message[]) => {
     setIsLoading(true);
     
-    // Simulate AI response based on message count
-    const userMsgCount = msgs.filter(m => m.role === "user").length;
-    const responseIndex = Math.min(userMsgCount - 1, dummyResponses.length - 1);
-    const responseText = dummyResponses[Math.max(0, responseIndex)];
-    
-    // Simulate streaming effect
-    let currentText = "";
-    const words = responseText.split(' ');
-    
-    for (let i = 0; i < words.length; i++) {
-      currentText += (i > 0 ? ' ' : '') + words[i];
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
-        }
-        return [...prev, { role: "assistant", content: currentText }];
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase3-intake`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          // Send the full conversation as structured messages, not just a flattened string
+          messages: msgs.map(m => `${m.role === 'user' ? 'FOUNDER' : 'ADVISOR'}: ${m.content}`).join('\n\n'),
+          project_id: projectId
+        })
       });
-      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-    }
 
-    // Check for intake completion
-    if (currentText.includes("<INTAKE_COMPLETE>")) {
-      const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
-      if (match) {
-        try {
-          const intakeData = JSON.parse(match[1]);
-          setCompletedAreas(15);
-          clearIntakeProgress(projectId, "phase3");
-          toast.success("GTM assessment complete! Ready for growth analysis.");
-          onIntakeComplete(intakeData);
-        } catch (e) {
-          console.error("Failed to parse intake data:", e);
+      if (response.ok) {
+        const data = await response.json();
+        const responseText = data.data?.response;
+        
+        if (!responseText) {
+          console.error('Empty response from AI service');
+          toast.error("Received empty response from AI service");
+          setIsLoading(false);
+          return;
         }
+        
+        // Simulate streaming effect for better UX
+        let currentText = "";
+        const words = responseText.split(' ');
+        
+        for (let i = 0; i < words.length; i++) {
+          currentText += (i > 0 ? ' ' : '') + words[i];
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
+            }
+            return [...prev, { role: "assistant", content: currentText }];
+          });
+          await new Promise(resolve => setTimeout(resolve, 30));
+        }
+
+        // Parse area completion signal
+        const areaMatch = currentText.match(/<AREA_COMPLETE:(\d+)>/);
+        if (areaMatch) {
+          const completedArea = parseInt(areaMatch[1]);
+          setCompletedAreas(prev => Math.max(prev, completedArea));
+        }
+
+        // Strip the signal from the displayed message
+        setMessages(prev =>
+          prev.map((m, idx) =>
+            idx === prev.length - 1
+              ? { ...m, content: m.content.replace(/<AREA_COMPLETE:\d+>/g, "").trim() }
+              : m
+          )
+        );
+
+        // Check for intake completion
+        if (currentText.includes("<INTAKE_COMPLETE>")) {
+          const match = currentText.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
+          if (match) {
+            try {
+              const intakeData = JSON.parse(match[1]);
+              setCompletedAreas(15);
+              clearIntakeProgress(projectId, "phase3");
+              toast.success("GTM assessment complete! Ready for growth analysis.");
+              onIntakeComplete(intakeData);
+            } catch (e) {
+              console.error("Failed to parse intake data:", e);
+            }
+          }
+        }
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get AI response');
       }
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "I apologize, but I'm having trouble connecting right now. Please try again in a moment." 
+      }]);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const sendMessage = async () => {
@@ -225,7 +256,10 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
                 : "bg-card border border-border"
             }`}>
               {msg.role === "assistant"
-                ? msg.content.replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "").trim()
+                ? msg.content
+                    .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
+                    .replace(/<AREA_COMPLETE:\d+>/g, "")
+                    .trim()
                 : msg.content}
             </div>
             {msg.role === "user" && (

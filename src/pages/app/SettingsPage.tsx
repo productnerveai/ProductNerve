@@ -70,6 +70,39 @@ export default function SettingsPage() {
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [profileSubmitting, setProfileSubmitting] = useState(false);
 
+  // Load profile completion status on component mount
+  useEffect(() => {
+    if (user) {
+      loadProfileCompletionStatus();
+    }
+  }, [user]);
+
+  const loadProfileCompletionStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/auth/profile-completion`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProfileStatus(data.data.profile_completion_status);
+        setProfileForm({
+          official_company_name: data.data.official_company_name || "",
+          registration_number: data.data.registration_number || "",
+          website: data.data.website || "",
+          custom_email: data.data.custom_email || "",
+          phone: data.data.phone || "",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load profile completion status:', error);
+    }
+  };
+
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSaveProfile = async () => {
@@ -229,11 +262,64 @@ export default function SettingsPage() {
 
   const handleProfileSubmit = async () => {
     setProfileSubmitting(true);
-    // TODO: replace with real API call (file upload + record insert)
-    await new Promise((r) => setTimeout(r, 600));
-    toast.success("KYC submitted for review!");
-    setProfileStatus("pending");
-    setProfileSubmitting(false);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Prepare submission data with proper typing
+      const submissionData: any = {
+        official_company_name: profileForm.official_company_name,
+        registration_number: profileForm.registration_number,
+        website: profileForm.website,
+        custom_email: profileForm.custom_email,
+        phone: profileForm.phone
+      };
+
+      // Handle file upload as base64 if file exists
+      if (profileFile) {
+        const reader = new FileReader();
+        
+        const fileData = await new Promise<any>((resolve, reject) => {
+          reader.onload = (e) => {
+            const result = e.target?.result;
+            if (typeof result === 'string') {
+              resolve({
+                name: profileFile.name,
+                type: profileFile.type,
+                data: result.split(',')[1] // Get base64 data without prefix
+              });
+            } else {
+              reject(new Error('Failed to read file as string'));
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(profileFile);
+        });
+
+        submissionData.document = fileData;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/profile-completion`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(submissionData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success("Profile completion submitted for review!");
+        setProfileStatus(data.data.profile_completion_status);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to submit profile completion");
+      }
+    } catch (error) {
+      toast.error("Network error during profile submission");
+    } finally {
+      setProfileSubmitting(false);
+    }
   };
 
   // ─── Profile Completion badge ──────────────────────────────────────────────────────────────

@@ -1,6 +1,4 @@
 import { useState } from "react";
-// import { supabase } from "@/integrations/supabase/client";
-// import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,10 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MessageSquarePlus } from "lucide-react";
 import { toast } from "sonner";
-import { notifyAdminsNewFeedback } from "@/lib/support-notifications";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function BetaFeedbackWidget() {
-  // const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("bug");
   const [title, setTitle] = useState("");
@@ -19,22 +17,44 @@ export default function BetaFeedbackWidget() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
-    // if (!title.trim() || !user) return;
+    if (!title.trim()) {
+      toast.error("Please provide a title for your feedback");
+      return;
+    }
+
     setSubmitting(true);
-    // const { error } = await supabase.from("beta_feedback").insert({
-    //   user_id: user.id,
-    //   feedback_type: type,
-    //   title: title.trim(),
-    //   description: description.trim(),
-    // });
-    setSubmitting(false);
-    // if (error) { toast.error("Failed to submit feedback"); return; }
-    toast.success("Thank you for your feedback!");
-    notifyAdminsNewFeedback({ feedback_type: type, title: title.trim(), description: description.trim() });
-    setTitle("");
-    setDescription("");
-    setType("bug");
-    setOpen(false);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/support/tickets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          feedback_type: type
+        })
+      });
+
+      if (response.ok) {
+        toast.success("Thank you for your feedback! We'll get back to you soon.");
+        setTitle("");
+        setDescription("");
+        setType("bug");
+        setOpen(false);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || "Failed to submit feedback");
+      }
+    } catch (error) {
+      console.error("Failed to submit feedback:", error);
+      toast.error("Failed to submit feedback. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -42,12 +62,12 @@ export default function BetaFeedbackWidget() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <MessageSquarePlus className="h-4 w-4" />
-          Beta Feedback
+          Feedback & Support
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Submit Feedback</DialogTitle>
+          <DialogTitle>Feedback & Support</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <Select value={type} onValueChange={setType}>
@@ -56,6 +76,7 @@ export default function BetaFeedbackWidget() {
               <SelectItem value="bug">Bug Report</SelectItem>
               <SelectItem value="feature">Feature Request</SelectItem>
               <SelectItem value="tool">Tool Feedback</SelectItem>
+              <SelectItem value="improvement">Improvement</SelectItem>
               <SelectItem value="general">General</SelectItem>
             </SelectContent>
           </Select>

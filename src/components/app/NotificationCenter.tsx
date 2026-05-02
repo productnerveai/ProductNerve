@@ -8,36 +8,36 @@ import { formatDistanceToNow } from "date-fns";
 
 // Dummy notifications data
 const dummyNotifications = [
-  {
-    id: "1",
-    title: "New product launch",
-    message: "Check out our latest product features and improvements",
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    read_at: null,
-    user_id: "user1",
-    priority: "high",
-    link: "/app/products"
-  },
-  {
-    id: "2",
-    title: "System update",
-    message: "System maintenance scheduled for tonight at 11 PM",
-    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-    read_at: null,
-    user_id: "user1",
-    priority: "medium",
-    link: null
-  },
-  {
-    id: "3",
-    title: "Welcome to ProductNerve",
-    message: "Get started with our quick onboarding guide",
-    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-    read_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-    user_id: "user1",
-    priority: "low",
-    link: "/app/onboarding"
-  }
+  // {
+  //   id: "1",
+  //   title: "New product launch",
+  //   message: "Check out our latest product features and improvements",
+  //   created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+  //   read_at: null,
+  //   user_id: "user1",
+  //   priority: "high",
+  //   link: "/app/products"
+  // },
+  // {
+  //   id: "2",
+  //   title: "System update",
+  //   message: "System maintenance scheduled for tonight at 11 PM",
+  //   created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+  //   read_at: null,
+  //   user_id: "user1",
+  //   priority: "medium",
+  //   link: null
+  // },
+  // {
+  //   id: "3",
+  //   title: "Welcome to ProductNerve",
+  //   message: "Get started with our quick onboarding guide",
+  //   created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+  //   read_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
+  //   user_id: "user1",
+  //   priority: "low",
+  //   link: "/app/onboarding"
+  // }
 ];
 
 export default function NotificationCenter() {

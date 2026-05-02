@@ -6,32 +6,12 @@ import PhaseTransitionPrompt from "@/components/phase-transition/PhaseTransition
 import PhaseFileUpload from "@/components/shared/PhaseFileUpload";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface Phase1ContainerProps {
   projectId: string;
   onPhaseComplete?: () => void | Promise<void>;
 }
-
-// Dummy phase data
-const dummyPhaseData = {
-  proj1: {
-    phase1_status: "complete",
-    intake_complete: true,
-    viability_score: 85,
-    classification: "High Potential"
-  },
-  proj2: {
-    phase1_status: "scoring",
-    intake_complete: true,
-    viability_score: null,
-    classification: null
-  },
-  proj3: {
-    phase1_status: "not_started",
-    intake_complete: false,
-    viability_score: null,
-    classification: null
-  }
-};
 
 export default function Phase1Container({ projectId, onPhaseComplete }: Phase1ContainerProps) {
   const [phase, setPhase] = useState<"loading" | "intake" | "upload" | "scoring" | "dashboard" | "transition">("loading");
@@ -43,52 +23,79 @@ export default function Phase1Container({ projectId, onPhaseComplete }: Phase1Co
 
   useEffect(() => { loadState(); }, [projectId]);
 
-  const loadState = () => {
-    // Simulate loading state
-    setTimeout(() => {
-      const projectData = dummyPhaseData[projectId as keyof typeof dummyPhaseData];
-      if (!projectData) {
-        setPhase("intake");
-        return;
-      }
+  const loadState = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase1/${projectId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-      const status = projectData.phase1_status || "not_started";
+      if (response.ok) {
+        const data = await response.json();
+        const projectData = data.data;
+        
+        const status = projectData.phase1_status || "not_started";
 
-      if (status === "complete" || status === "locked") {
-        setPhaseScore(projectData.viability_score);
-        setClassification(projectData.classification);
-        setPhase("dashboard");
-        return;
-      }
-
-      if (projectData.intake_complete) {
-        // Dummy intake data
-        setIntakeData({
-          idea_description: "AI-powered productivity platform for remote teams",
-          problem_statement: "Remote teams struggle with communication and project management",
-          target_users: "Remote workers, team managers, freelancers",
-          target_market: "SMB productivity tools market",
-          monetization_model: "SaaS subscription",
-          founder_background: "Tech industry veterans",
-          core_assumptions: "Remote work is here to stay",
-          follow_up_responses: { market_size: "Large" }
-        });
-
-        if (projectData.viability_score) {
-          setPhaseScore(projectData.viability_score);
-          setClassification(projectData.classification);
+        if (status === "complete" || status === "locked") {
+          setPhaseScore(projectData.phase1_score);
+          setClassification(projectData.phase1_classification);
           setPhase("dashboard");
+          return;
+        }
+
+        if (status === "in_progress" && projectData.phase1_data) {
+          setIntakeData(projectData.phase1_data);
+
+          if (projectData.phase1_score) {
+            setPhaseScore(projectData.phase1_score);
+            setClassification(projectData.phase1_classification);
+            setPhase("dashboard");
+          } else {
+            // Check if upload was completed by looking for a flag or data
+            // For now, we'll assume upload is needed if no score exists
+            setPhase("upload");
+          }
         } else {
-          setPhase("scoring");
+          setPhase("intake");
         }
       } else {
+        // If API fails, default to intake
         setPhase("intake");
       }
-    }, 1000);
+    } catch (error) {
+      console.error('Failed to load Phase 1 state:', error);
+      setPhase("intake");
+    }
   };
 
-  const handleIntakeComplete = (data: any) => {
+  const handleIntakeComplete = async (data: any) => {
     setIntakeData(data);
+    
+    // Save intake data to backend for persistence
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase1/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          phase1_status: 'in_progress',
+          phase1_data: data
+        })
+      });
+      
+      if (response.ok) {
+        console.log('Intake data saved successfully');
+      }
+    } catch (error) {
+      console.error('Failed to save intake data:', error);
+    }
+    
     setPhase("upload");
   };
 
@@ -96,33 +103,41 @@ export default function Phase1Container({ projectId, onPhaseComplete }: Phase1Co
     setPhase("scoring");
   };
 
-  const handleScoringComplete = () => {
-    // Simulate scoring completion with dummy data
-    setTimeout(() => {
-      const dummyScore = Math.floor(Math.random() * 30) + 70; // Random score between 70-100
-      const dummyClassifications = ["High Potential", "Moderate Potential", "Early Stage"];
-      const dummyClassification = dummyClassifications[Math.floor(Math.random() * dummyClassifications.length)];
-      
-      setPhaseScore(dummyScore);
-      setClassification(dummyClassification);
-      setPhase("transition");
-    }, 2000);
+  const handleScoringComplete = (scoreData: any) => {
+    setPhaseScore(scoreData.viability_score);
+    setClassification(scoreData.classification);
+    setPhase("transition");
   };
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (isProceeding) return;
     setIsProceeding(true);
 
-    // Simulate phase locking
-    setTimeout(() => {
-      toast.success("Phase 1 locked. Transitioning to Phase 2...");
-      if (onPhaseComplete) {
-        onPhaseComplete();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/validation/phase1/${projectId}/lock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success("Phase 1 locked. Transitioning to Phase 2...");
+        if (onPhaseComplete) {
+          onPhaseComplete();
+        } else {
+          setPhase("dashboard");
+        }
       } else {
-        setPhase("dashboard");
+        const error = await response.json();
+        toast.error(error.error || "Failed to lock Phase 1");
       }
+    } catch (error) {
+      toast.error("Network error while locking Phase 1");
+    } finally {
       setIsProceeding(false);
-    }, 2000);
+    }
   };
 
   const handleRerun = () => {
