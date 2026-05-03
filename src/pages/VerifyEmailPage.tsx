@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Mail, ArrowLeft, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://productnerve-backend.up.railway.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -136,7 +136,7 @@ export default function VerifyEmailPage() {
     setResending(true);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
