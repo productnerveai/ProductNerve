@@ -62,7 +62,10 @@ export default function DashboardPage() {
   };
 
   const loadDashboardData = async () => {
-    if (!activeWorkspace) return;
+    if (!activeWorkspace) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {
