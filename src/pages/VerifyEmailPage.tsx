@@ -115,7 +115,7 @@ export default function VerifyEmailPage() {
         }
         
         // Redirect to dashboard or login
-        navigate('/dashboard');
+        navigate('/login');
       } else {
         toast.error(data.error || 'Verification failed');
       }
