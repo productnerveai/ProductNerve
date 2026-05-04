@@ -2,6 +2,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import AppSidebar from "@/components/app/AppSidebar";
 import WorkspaceSelector from "@/components/app/WorkspaceSelector";
 import NotificationCenter from "@/components/app/NotificationCenter";
+import ProfileCompletionNotification from "@/components/app/ProfileCompletionNotification";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 // import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -26,6 +27,7 @@ export default function AppLayout() {
   return (
     // <WorkspaceProvider>
       <SidebarProvider>
+        <ProfileCompletionNotification />
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <div className="flex-1 flex flex-col">

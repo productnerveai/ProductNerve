@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Loader2, CheckCircle2, Circle, Wrench } from "lucide-react";
+import { Send, Bot, User, Loader2, CheckCircle2, Circle, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 import { saveIntakeProgress, loadIntakeProgress, clearIntakeProgress } from "@/lib/intake-autosave";
 
@@ -35,20 +35,23 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
   const [started, setStarted] = useState(false);
   const [completedAreas, setCompletedAreas] = useState<number>(0);
   const [sendingBlocked, setSendingBlocked] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [intakeData, setIntakeData] = useState<any>(null);
+  const [hasRerun, setHasRerun] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Dummy AI responses for simulation
-  const dummyResponses = [
-    "I understand you're ready to assess your execution capacity. Let me help you evaluate your resources across 10 key areas. First, tell me about your team's current size and composition.",
-    "That's helpful. Now let's discuss your capital situation. What's your current funding status and expected runway?",
-    "Good to know. Let's talk about your technical capabilities. What's your team's technical expertise and development capacity?",
-    "Thanks for sharing. Now, regarding speed vs stability - are you prioritizing rapid iteration or building robust, scalable systems?",
-    "I see. Let's discuss your validation objectives. What specific milestones are you trying to achieve in the next 3-6 months?",
-    "Important context. What's your team's risk appetite? Are you comfortable with high-risk, high-reward approaches?",
-    "Got it. Let's talk about operational capacity. What's your current bandwidth for taking on new initiatives?",
-    "Thanks for that. How urgent is revenue generation? Are you under pressure to monetize quickly?",
-    "Final question - what are your scalability intentions? Are you building for a niche market or planning for rapid expansion?",
-    "<INTAKE_COMPLETE>{\"commitment_level\":\"high\",\"capital_range\":\"100k-500k\",\"funding_expected\":true,\"team_capabilities\":[\"engineering\",\"product\"],\"technical_complexity\":\"medium\",\"speed_vs_stability\":\"balanced\",\"validation_objective\":\"product-market-fit\",\"risk_appetite\":\"moderate\",\"operational_capacity\":\"medium\",\"revenue_urgency\":\"medium\",\"scalability_intent\":\"moderate\",\"follow_up_responses\":{\"recommended_execution_mode\":\"balanced\"}}</INTAKE_COMPLETE>"
-  ]; 
+  // const dummyResponses = [
+  //   "I understand you're ready to assess your execution capacity. Let me help you evaluate your resources across 10 key areas. First, tell me about your team's current size and composition.",
+  //   "That's helpful. Now let's discuss your capital situation. What's your current funding status and expected runway?",
+  //   "Good to know. Let's talk about your technical capabilities. What's your team's technical expertise and development capacity?",
+  //   "Thanks for sharing. Now, regarding speed vs stability - are you prioritizing rapid iteration or building robust, scalable systems?",
+  //   "I see. Let's discuss your validation objectives. What specific milestones are you trying to achieve in the next 3-6 months?",
+  //   "Important context. What's your team's risk appetite? Are you comfortable with high-risk, high-reward approaches?",
+  //   "Got it. Let's talk about operational capacity. What's your current bandwidth for taking on new initiatives?",
+  //   "Thanks for that. How urgent is revenue generation? Are you under pressure to monetize quickly?",
+  //   "Final question - what are your scalability intentions? Are you building for a niche market or planning for rapid expansion?",
+  //   "<INTAKE_COMPLETE>{\"commitment_level\":\"high\",\"capital_range\":\"100k-500k\",\"funding_expected\":true,\"team_capabilities\":[\"engineering\",\"product\"],\"technical_complexity\":\"medium\",\"speed_vs_stability\":\"balanced\",\"validation_objective\":\"product-market-fit\",\"risk_appetite\":\"moderate\",\"operational_capacity\":\"medium\",\"revenue_urgency\":\"medium\",\"scalability_intent\":\"moderate\",\"follow_up_responses\":{\"recommended_execution_mode\":\"balanced\"}}</INTAKE_COMPLETE>"
+  // ];
 
   useEffect(() => {
     const saved = loadIntakeProgress(projectId, "phase2");
@@ -85,7 +88,7 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
 
   const streamResponse = async (msgs: Message[]) => {
     setIsLoading(true);
-    
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/validation/phase2-intake`, {
@@ -95,8 +98,7 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          // Send the full conversation as structured messages, not just a flattened string
-          messages: msgs.map(m => `${m.role === 'user' ? 'FOUNDER' : 'ADVISOR'}: ${m.content}`).join('\n\n'),
+          messages: msgs,   // just pass the array directly
           project_id: projectId
         })
       });
@@ -104,18 +106,18 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
       if (response.ok) {
         const data = await response.json();
         const responseText = data.data?.response;
-        
+
         if (!responseText) {
           console.error('Empty response from AI service');
           toast.error("Received empty response from AI service");
           setIsLoading(false);
           return;
         }
-        
+
         // Simulate streaming effect
         let currentText = "";
         const words = responseText.split(' ');
-        
+
         for (let i = 0; i < words.length; i++) {
           currentText += (i > 0 ? ' ' : '') + words[i];
           setMessages(prev => {
@@ -154,6 +156,8 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
               clearIntakeProgress(projectId, "phase2");
               toast.success("Execution capacity assessed! Ready for mode selection.");
               onIntakeComplete(intakeData);
+              // Don't display the INTAKE_COMPLETE message
+              return;
             } catch (e) {
               console.error("Failed to parse intake data:", e);
             }
@@ -162,27 +166,27 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
       } else {
         const error = await response.json();
         console.error('AI Service Error:', error);
-        toast.error("AI service temporarily unavailable. Using fallback responses.");
-        
+        toast.error("AI service temporarily unavailable.");
+
         // Fallback to dummy response with retry logic
-        const userMsgCount = msgs.filter(m => m.role === "user").length;
-        const responseIndex = Math.min(userMsgCount - 1, dummyResponses.length - 1);
-        const responseText = dummyResponses[Math.max(0, responseIndex)];
-        
+        // const userMsgCount = msgs.filter(m => m.role === "user").length;
+        // const responseIndex = Math.min(userMsgCount - 1, dummyResponses.length - 1);
+        // const responseText = dummyResponses[Math.max(0, responseIndex)];
+
         let currentText = "";
-        const words = responseText.split(' ');
-        
-        for (let i = 0; i < words.length; i++) {
-          currentText += (i > 0 ? ' ' : '') + words[i];
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last?.role === "assistant") {
-              return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
-            }
-            return [...prev, { role: "assistant", content: currentText }];
-          });
-          await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-        }
+        // const words = responseText.split(' ');
+
+        // for (let i = 0; i < words.length; i++) {
+        //   currentText += (i > 0 ? ' ' : '') + words[i];
+        //   setMessages(prev => {
+        //     const last = prev[prev.length - 1];
+        //     if (last?.role === "assistant") {
+        //       return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: currentText } : m);
+        //     }
+        //     return [...prev, { role: "assistant", content: currentText }];
+        //   });
+        //   await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+        // }
 
         // Check for intake completion
         if (currentText.includes("<INTAKE_COMPLETE>")) {
@@ -194,6 +198,8 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
               clearIntakeProgress(projectId, "phase2");
               toast.success("Execution capacity assessed! Ready for mode selection.");
               onIntakeComplete(intakeData);
+              // Don't display the INTAKE_COMPLETE message
+              return;
             } catch (e) {
               console.error("Failed to parse intake data:", e);
             }
@@ -202,7 +208,7 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
       }
     } catch (error) {
       console.error('Phase 2 intake error:', error);
-      
+
       // Handle network errors specifically
       if (error.name === 'TypeError' || error.message.includes('split')) {
         toast.error("Communication error with AI service. Please try again.");
@@ -280,11 +286,10 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
           {INTAKE_AREAS.map((area, i) => (
             <span
               key={i}
-              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                i < completedAreas
+              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${i < completedAreas
                   ? "bg-accent/10 text-accent border-accent/20"
                   : "bg-muted/50 text-muted-foreground border-transparent"
-              }`}
+                }`}
             >
               {i < completedAreas && <CheckCircle2 className="h-2.5 w-2.5 inline mr-0.5 -mt-0.5" />}
               {area}
@@ -302,16 +307,15 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
                 <Bot className="h-4 w-4 text-accent" />
               </div>
             )}
-            <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap ${
-              msg.role === "user"
+            <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap ${msg.role === "user"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border"
-            }`}>
+              }`}>
               {msg.role === "assistant"
                 ? msg.content
-                    .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
-                    .replace(/<AREA_COMPLETE:\d+>/g, "")
-                    .trim()
+                  .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
+                  .replace(/<AREA_COMPLETE:\d+>/g, "")
+                  .trim()
                 : msg.content}
             </div>
             {msg.role === "user" && (
@@ -351,6 +355,70 @@ export default function Phase2IntakeEngine({ projectId, onIntakeComplete }: Phas
           <Send className="h-4 w-4" />
         </Button>
       </div>
+      
+      {/* Preview Report Dialog */}
+      {showPreview && intakeData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Preview Your Execution Report</h3>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowPreview(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4 text-sm">
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+                <p className="font-medium text-yellow-800 mb-2">⚠️ Important Decision Point</p>
+                <p>You can only re-run this phase once. Please review carefully before finalizing.</p>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="font-medium mb-2">Execution Commitment</h4>
+                <p className="text-muted-foreground">{intakeData.execution_commitment || "Not specified"}</p>
+                
+                <h4 className="font-medium mb-2">Capital Readiness</h4>
+                <p className="text-muted-foreground">{intakeData.capital_readiness || "Not specified"}</p>
+                
+                <h4 className="font-medium mb-2">Team Access</h4>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                  {intakeData.team_access?.map((item: any, index: number) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+                
+                <h4 className="font-medium mb-2">Revenue Urgency</h4>
+                <p className="text-muted-foreground">{intakeData.revenue_urgency || "Not specified"}</p>
+                
+                <h4 className="font-medium mb-2">Scalability Intent</h4>
+                <p className="text-muted-foreground">{intakeData.scalability_intent || "Not specified"}</p>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  onClick={() => {
+                    if (!hasRerun) {
+                      onIntakeComplete(intakeData);
+                      setHasRerun(true);
+                      toast.success("Report finalized! Proceeding to next phase.");
+                    } else {
+                      toast.error("You can only re-run this phase once.");
+                    }
+                  }}
+                  disabled={hasRerun}
+                  className="flex-1"
+                >
+                  {hasRerun ? "Finalize Report" : "Re-run Phase"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

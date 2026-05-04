@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Loader2, CheckCircle2, Circle, Rocket } from "lucide-react";
+import { Send, Bot, User, Loader2, CheckCircle2, Circle, Rocket, X } from "lucide-react";
 import { toast } from "sonner";
 import { saveIntakeProgress, loadIntakeProgress, clearIntakeProgress } from "@/lib/intake-autosave";
 
@@ -40,6 +40,9 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
   const [started, setStarted] = useState(false);
   const [completedAreas, setCompletedAreas] = useState<number>(0);
   const [sendingBlocked, setSendingBlocked] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [intakeData, setIntakeData] = useState<any>(null);
+  const [hasRerun, setHasRerun] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,7 +80,7 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
 
   const streamResponse = async (msgs: Message[]) => {
     setIsLoading(true);
-    
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/validation/phase3-intake`, {
@@ -87,8 +90,7 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          // Send the full conversation as structured messages, not just a flattened string
-          messages: msgs.map(m => `${m.role === 'user' ? 'FOUNDER' : 'ADVISOR'}: ${m.content}`).join('\n\n'),
+          messages: msgs,   // just pass the array directly
           project_id: projectId
         })
       });
@@ -96,18 +98,18 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
       if (response.ok) {
         const data = await response.json();
         const responseText = data.data?.response;
-        
+
         if (!responseText) {
           console.error('Empty response from AI service');
           toast.error("Received empty response from AI service");
           setIsLoading(false);
           return;
         }
-        
+
         // Simulate streaming effect for better UX
         let currentText = "";
         const words = responseText.split(' ');
-        
+
         for (let i = 0; i < words.length; i++) {
           currentText += (i > 0 ? ' ' : '') + words[i];
           setMessages(prev => {
@@ -143,9 +145,9 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
             try {
               const intakeData = JSON.parse(match[1]);
               setCompletedAreas(15);
-              clearIntakeProgress(projectId, "phase3");
-              toast.success("GTM assessment complete! Ready for growth analysis.");
-              onIntakeComplete(intakeData);
+              setIntakeData(intakeData);
+              setShowPreview(true);
+              toast.success("GTM assessment complete! Review your report.");
             } catch (e) {
               console.error("Failed to parse intake data:", e);
             }
@@ -157,9 +159,9 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
       }
     } catch (error) {
       console.error('Error getting AI response:', error);
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
-        content: "I apologize, but I'm having trouble connecting right now. Please try again in a moment." 
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "I apologize, but I'm having trouble connecting right now. Please try again in a moment."
       }]);
     } finally {
       setIsLoading(false);
@@ -228,11 +230,10 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
           {INTAKE_AREAS.map((area, i) => (
             <span
               key={i}
-              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                i < completedAreas
+              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${i < completedAreas
                   ? "bg-accent/10 text-accent border-accent/20"
                   : "bg-muted/50 text-muted-foreground border-transparent"
-              }`}
+                }`}
             >
               {i < completedAreas && <CheckCircle2 className="h-2.5 w-2.5 inline mr-0.5 -mt-0.5" />}
               {area}
@@ -250,16 +251,15 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
                 <Bot className="h-4 w-4 text-accent" />
               </div>
             )}
-            <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap ${
-              msg.role === "user"
+            <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm whitespace-pre-wrap ${msg.role === "user"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border"
-            }`}>
+              }`}>
               {msg.role === "assistant"
                 ? msg.content
-                    .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
-                    .replace(/<AREA_COMPLETE:\d+>/g, "")
-                    .trim()
+                  .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/, "")
+                  .replace(/<AREA_COMPLETE:\d+>/g, "")
+                  .trim()
                 : msg.content}
             </div>
             {msg.role === "user" && (
@@ -299,6 +299,90 @@ export default function Phase3IntakeEngine({ projectId, onIntakeComplete }: Phas
           <Send className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Preview Report Dialog */}
+      {showPreview && intakeData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Preview Your GTM Report</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreview(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+                <p className="font-medium text-yellow-800 mb-2">⚠️ Important Decision Point</p>
+                <p>You can only re-run this phase once. Please review carefully before finalizing.</p>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-medium mb-2">Target Segment</h4>
+                <p className="text-muted-foreground">{intakeData.target_segment || "Not specified"}</p>
+
+                <h4 className="font-medium mb-2">Problem Urgency</h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Intensity: </span>
+                  <span className={`font-medium ${intakeData.problem_urgency?.intensity >= 7 ? 'text-red-600' :
+                      intakeData.problem_urgency?.intensity >= 5 ? 'text-orange-600' :
+                        intakeData.problem_urgency?.intensity >= 3 ? 'text-yellow-600' :
+                          'text-green-600'
+                    }`}>
+                    {intakeData.problem_urgency?.intensity || 0}/10
+                  </span>
+                </div>
+                <p className="text-muted-foreground">Frequency: {intakeData.problem_urgency?.frequency || "Not specified"}</p>
+                <p className="text-muted-foreground">Urgency Level: {intakeData.problem_urgency?.urgency_level || "Not specified"}</p>
+
+                <h4 className="font-medium mb-2">Market Context</h4>
+                <p><strong>Geography:</strong> {intakeData.market_context?.geography || "Not specified"}</p>
+                <p><strong>Timing:</strong> {intakeData.market_context?.timing_reason || "Not specified"}</p>
+                <p><strong>Infrastructure Ready:</strong> {intakeData.market_context?.infrastructure_ready ? "Yes" : "No"}</p>
+
+                <h4 className="font-medium mb-2">Differentiation</h4>
+                <p className="text-muted-foreground">{intakeData.differentiation || "Not specified"}</p>
+
+                <h4 className="font-medium mb-2">Founder Advantage</h4>
+                <p className="text-muted-foreground">{intakeData.founder_advantage || "Not specified"}</p>
+
+                <h4 className="font-medium mb-2">Key Assumptions</h4>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                  {intakeData.key_assumptions?.map((assumption: any, index: number) => (
+                    <li key={index}>{assumption}</li>
+                  ))}
+                </ul>
+
+                <h4 className="font-medium mb-2">Validation Evidence</h4>
+                <p><strong>Type:</strong> {intakeData.validation_evidence?.type || "Not specified"}</p>
+                <p><strong>Details:</strong> {intakeData.validation_evidence?.details || "Not specified"}</p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={() => {
+                    if (!hasRerun) {
+                      onIntakeComplete(intakeData);
+                      setHasRerun(true);
+                      toast.success("Report finalized! Proceeding to next phase.");
+                    } else {
+                      toast.error("You can only re-run this phase once.");
+                    }
+                  }}
+                  disabled={hasRerun}
+                  className="flex-1"
+                >
+                  {hasRerun ? "Finalize Report" : "Re-run Phase"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

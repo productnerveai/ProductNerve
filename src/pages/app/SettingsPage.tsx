@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { User, Building2, Trash2, Plus, ShieldCheck, Upload, Bell } from "lucide-react";
+import { User, Building2, Trash2, Plus, ShieldCheck, Upload, Bell, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -68,6 +68,7 @@ export default function SettingsPage() {
     phone: "",
   });
   const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profileDocumentUrl, setProfileDocumentUrl] = useState<string | null>(null);
   const [profileSubmitting, setProfileSubmitting] = useState(false);
 
   // Load profile completion status on component mount
@@ -97,6 +98,7 @@ export default function SettingsPage() {
           custom_email: data.data.custom_email || "",
           phone: data.data.phone || "",
         });
+        setProfileDocumentUrl(data.data.profile_document_url || null);
       }
     } catch (error) {
       console.error('Failed to load profile completion status:', error);
@@ -623,18 +625,35 @@ export default function SettingsPage() {
                 <div>
                   <Label>Company Registration Document</Label>
                   <div className="mt-1.5">
-                    <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 hover:bg-muted/50 transition-colors">
-                      <Upload className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {profileFile?.name || "Upload PDF, JPG, or PNG (max 10MB)"}
-                      </span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp"
-                        className="hidden"
-                        onChange={(e) => setProfileFile(e.target.files?.[0] || null)}
-                      />
-                    </label>
+                    {profileDocumentUrl ? (
+                      <div className="flex items-center gap-2 p-3 border border-border rounded-lg bg-green-50">
+                        <FileText className="h-4 w-4 text-green-600" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-800">Document Uploaded</p>
+                          <a 
+                            href={profileDocumentUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-green-600 hover:underline"
+                          >
+                            View Document
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {profileFile?.name || "Upload PDF, JPG, or PNG (max 10MB)"}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          className="hidden"
+                          onChange={(e) => setProfileFile(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                    )}
                   </div>
                 </div>
                 <Button

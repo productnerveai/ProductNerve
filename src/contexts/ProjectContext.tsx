@@ -121,9 +121,11 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
 
       if (response.ok) {
         const data = await response.json();
-        setProjects(prev => [data.data, ...prev]);
+        const newProject = data.data;
+        setProjects(prev => [newProject, ...prev]);
         toast.success("Project created!");
-        navigate("/app");
+        // Redirect to project detail page with the new project ID
+        navigate(`/app/projects/${newProject._id || newProject.id}`);
       } else {
         const error = await response.json();
         toast.error(error.error || "Failed to create project");
