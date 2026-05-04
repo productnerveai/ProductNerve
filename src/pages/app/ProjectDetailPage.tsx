@@ -8,8 +8,10 @@ import Phase1Container from "@/components/phase1/Phase1Container";
 import Phase2Container from "@/components/phase2/Phase2Container";
 import Phase3Container from "@/components/phase3/Phase3Container";
 import MasterVentureDashboard from "@/components/dashboard/MasterVentureDashboard";
+import RAGFolder from "@/components/project/RAGFolder";
 import PaywallModal from "@/components/billing/PaywallModal";
 import { useProject } from "@/contexts/ProjectContext";
+import { FolderOpen } from "lucide-react";
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
@@ -934,10 +936,11 @@ export default function ProjectDetailPage() {
   const isP3Done = p3 === "locked" || p3 === "complete";
 
   const phaseSteps = [
+    // { key: "rag", label: "Knowledge Base", icon: <FolderOpen className="h-4 w-4" />, done: false },
     { key: "phase1", label: "Validation", done: isP1Done },
     { key: "phase2", label: "Execution", done: isP2Done },
     { key: "phase3", label: "Growth", done: isP3Done },
-    { key: "dashboard", label: "Summary", done: isP3Done, locked: !hasAccess && isP3Done },
+    { key: "dashboard", label: "Dashboard", done: isP1Done && isP2Done && isP3Done }
   ];
 
   return (
@@ -996,6 +999,9 @@ export default function ProjectDetailPage() {
 
       {/* Tab content */}
       <div>
+        {activeTab === "rag" && (
+          <RAGFolder projectId={projectId!} />
+        )}
         {activeTab === "phase1" && (
           <Phase1Container
             projectId={projectId!}
