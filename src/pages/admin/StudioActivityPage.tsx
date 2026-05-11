@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Target, FlaskConical, TrendingUp, Map, BookOpen, FileText } from "lucide-react";
 import { format } from "date-fns";
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 interface ActivityItem {
   id: string;
@@ -30,8 +32,11 @@ export default function StudioActivityPage() {
   const { data: activities, isLoading } = useQuery({
     queryKey: ["admin-studio-activity"],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return [];
+      const response = await AdminApiService.getStudioActivity();
+      if (response.success) {
+        return response.data.activities || [];
+      }
+      throw new Error("Failed to load studio activity");
     },
   });
 

@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 
-export type AdminRole = "super_admin" | "product_analyst" | "support_specialist" | "growth_analyst";
+export type AdminRole = "admin" | "product_analyst" | "support_specialist" | "growth_analyst";
 
 /**
  * Permission matrix per role.
@@ -8,7 +8,7 @@ export type AdminRole = "super_admin" | "product_analyst" | "support_specialist"
  * Others are explicitly scoped.
  */
 const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
-  super_admin: ["*"],
+  admin: ["*"],
   product_analyst: [
     "/admin",
     "/admin/platform-analytics",
@@ -54,8 +54,8 @@ export function useAdminRole() {
     
     // Map backend roles to frontend admin roles
     switch (userRole) {
-      case "super_admin":
-        return "super_admin";
+      case "admin":
+        return "admin";
       case "product_analyst":
         return "product_analyst";
       case "support_specialist":
@@ -72,13 +72,13 @@ export function useAdminRole() {
 
   const hasAccess = (route: string): boolean => {
     if (!adminRole) return false;
-    if (adminRole === "super_admin") return true;
+    if (adminRole === "admin") return true;
     const perms = ROLE_PERMISSIONS[adminRole] || [];
     return perms.some(p => p === "*" || route === p || route.startsWith(p + "/"));
   };
 
   // Granular permission helpers
-  const isSuperAdmin = adminRole === "super_admin";
+  const isSuperAdmin = adminRole === "admin";
   const canManageUsers = isSuperAdmin || adminRole === "product_analyst" || adminRole === "growth_analyst";
   const canManageBilling = isSuperAdmin;
   const canViewAnalytics = isSuperAdmin || adminRole === "product_analyst" || adminRole === "growth_analyst";

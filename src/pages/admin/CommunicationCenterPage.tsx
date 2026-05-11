@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Bell, BarChart3, Plus, RotateCcw, Send, Trash2, Users, Archive } from "lucide-react";
+import { Bell, BarChart3, Plus, RotateCcw, Send, Trash2, Users, Archive, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,17 +12,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import AdminApiService from "@/services/adminApi";
 
 type NotificationRow = {
+  _id: string;
   id: string;
   title: string;
   message: string;
-  channel: string;
-  priority: string;
-  sent_status: string;
-  user_id: string | null;
-  action_url: string | null;
-  link: string | null;
+  type: string;
+  read: boolean;
+  archived: boolean;
+  user_id: {
+    _id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  metadata: any;
   created_at: string;
 };
 
@@ -29,9 +36,10 @@ type BroadcastRow = {
   id: string;
   title: string;
   message: string;
-  channel: string;
-  target_group: string;
+  channel: 'email' | 'in_app' | 'sms';
+  target_group: 'all_users' | 'active_users' | 'pro_users' | 'free_users' | 'beta_users';
   sent_count: number | null;
+  status: 'draft' | 'scheduled' | 'sent' | 'failed';
   created_at: string;
 };
 
@@ -51,199 +59,241 @@ const initialForm: AdminBroadcastForm = {
   timeFilter: "all",
 };
 
-// Generate dummy communication data
-const generateDummyBroadcasts = () => [
-  {
-    id: "broadcast1",
-    title: "System Maintenance Notice",
-    message: "We will be performing scheduled maintenance on our servers tonight from 2-4 AM EST.",
-    channel: "in_app",
-    target_group: "all_users",
-    sent_count: 1247,
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "broadcast2",
-    title: "New Feature Release",
-    message: "Excited to announce our new AI-powered roadmap generator is now live!",
-    channel: "email",
-    target_group: "pro_users",
-    sent_count: 342,
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "broadcast3",
-    title: "Beta Program Invitation",
-    message: "Join our exclusive beta program and get early access to new features.",
-    channel: "in_app",
-    target_group: "active_users",
-    sent_count: 892,
-    created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const generateDummyNotifications = () => [
-  {
-    id: "notif1",
-    title: "Project Completed",
-    message: "Your AI Project Manager project has been successfully completed.",
-    channel: "in_app",
-    priority: "high",
-    sent_status: "sent",
-    user_id: "user1",
-    action_url: "/projects/proj1",
-    link: "/projects/proj1",
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "notif2",
-    title: "Subscription Renewal",
-    message: "Your Pro subscription will renew in 7 days.",
-    channel: "email",
-    priority: "medium",
-    sent_status: "pending",
-    user_id: "user2",
-    action_url: "/billing",
-    link: "/billing",
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "notif3",
-    title: "New Feature Available",
-    message: "Check out our new user story generator tool.",
-    channel: "in_app",
-    priority: "low",
-    sent_status: "failed",
-    user_id: "user3",
-    action_url: "/studio/user-stories",
-    link: "/studio/user-stories",
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const generateDummyFeedback = () => [
-  {
-    id: "feedback1",
-    user_email: "user@example.com",
-    rating: 5,
-    comment: "Great platform! Very intuitive.",
-    feature: "ICP Builder",
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "feedback2",
-    user_email: "test@example.com",
-    rating: 4,
-    comment: "Roadmap generator is amazing.",
-    feature: "Roadmap Generator",
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 export default function CommunicationCenterPage() {
   const [dialog, setDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<NotificationRow | null>(null);
   const [form, setForm] = useState<AdminBroadcastForm>(initialForm);
   const [broadcasts, setBroadcasts] = useState<BroadcastRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [archivedNotifications, setArchivedNotifications] = useState<NotificationRow[]>([]);
   const [feedbackList, setFeedbackList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [notificationPage, setNotificationPage] = useState(1);
+  const [archivedPage, setArchivedPage] = useState(1);
+  const [notificationsPagination, setNotificationsPagination] = useState<any>(null);
+  const [archivedPagination, setArchivedPagination] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const notificationsPerPage = 10;
 
   useEffect(() => {
-    // Simulate initial loading
-    setIsLoading(true);
-    setTimeout(() => {
-      setBroadcasts(generateDummyBroadcasts());
-      setNotifications(generateDummyNotifications());
-      setFeedbackList(generateDummyFeedback());
-      setIsLoading(false);
-    }, 1000);
+    loadCommunicationData();
   }, []);
 
-  // Generate dummy delivery stats
-  const deliveryStats = useMemo(() => ({
-    total: 2487,
-    email_sent: 1834,
-    email_failed: 23,
-    in_app: 567,
-    push: 63,
-  }), []);
+  const loadCommunicationData = async (page = 1) => {
+    setIsLoading(true);
+    try {
+      const [broadcastsResponse, notificationsResponse, archivedResponse] = await Promise.all([
+        AdminApiService.getAllBroadcasts(),
+        AdminApiService.getAllNotifications({ page, limit: notificationsPerPage }),
+        AdminApiService.getAllNotifications({ page: archivedPage, limit: notificationsPerPage, include_archived: true })
+      ]);
+
+      if (broadcastsResponse.success) {
+        console.log('Broadcasts data received:', broadcastsResponse.data.broadcasts);
+        setBroadcasts(broadcastsResponse.data.broadcasts);
+      }
+
+      if (notificationsResponse.success) {
+        console.log('Notifications data received:', notificationsResponse.data.notifications);
+        setNotifications(notificationsResponse.data.notifications);
+        setNotificationsPagination(notificationsResponse.data.pagination);
+      }
+
+      if (archivedResponse.success) {
+        setArchivedNotifications(archivedResponse.data.notifications.filter((n: NotificationRow) => n.archived));
+        setArchivedPagination(archivedResponse.data.pagination);
+      }
+
+      if (!broadcastsResponse.success || !notificationsResponse.success) {
+        toast.error("Failed to load communication data");
+      }
+    } catch (error) {
+      toast.error("Error loading communication data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadNotificationsPage = (page: number) => {
+    setNotificationPage(page);
+    loadCommunicationData(page);
+  };
+
+  const loadArchivedPage = (page: number) => {
+    setArchivedPage(page);
+    loadCommunicationData(notificationPage);
+  };
+
+  // Calculate real delivery stats from actual data
+  const deliveryStats = useMemo(() => {
+    const totalBroadcasts = broadcasts.length;
+    const totalNotifications = notificationsPagination?.total || notifications.length;
+    const unreadNotifications = notifications.filter(n => !n.read).length;
+    const readNotifications = notifications.filter(n => n.read).length;
+    
+    // Count notification types
+    const typeCounts = notifications.reduce((acc, n) => {
+      acc[n.type] = (acc[n.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      total: totalBroadcasts + totalNotifications,
+      email_sent: totalNotifications, // All notifications are sent via email
+      in_app: totalNotifications, // All notifications also appear in-app
+      unread: unreadNotifications,
+      read: readNotifications,
+      type_counts: typeCounts,
+      push: 0, // No push notifications yet
+      total_sent: totalNotifications
+    };
+  }, [broadcasts, notifications, notificationsPagination]);
 
   const sendBroadcast = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const newBroadcast = {
-        id: `broadcast_${Date.now()}`,
+    try {
+      const response = await AdminApiService.createBroadcast({
         title: form.title,
         message: form.message,
         channel: form.channel,
-        target_group: form.audience,
-        sent_count: Math.floor(Math.random() * 1500) + 500,
-        created_at: new Date().toISOString(),
-      };
-      
-      setBroadcasts(prev => [newBroadcast, ...prev]);
-      
-      // Add notifications for the broadcast
-      const newNotifications = Array.from({ length: 10 }, (_, i) => ({
-        id: `notif_${Date.now()}_${i}`,
-        title: form.title,
-        message: form.message,
-        channel: form.channel,
-        priority: "medium",
-        sent_status: "sent",
-        user_id: `user${i + 1}`,
-        action_url: null,
-        link: null,
-        created_at: new Date().toISOString(),
-      }));
-      
-      setNotifications(prev => [...newNotifications, ...prev]);
-      
-      toast.success(`Broadcast queued for ${newBroadcast.sent_count} users`);
-      setDialog(false);
-      setForm(initialForm);
+        target_group: form.audience
+      });
+
+      if (response.success) {
+        setBroadcasts(prev => [response.data, ...prev]);
+        toast.success(`Broadcast queued for ${response.data.sent_count || 0} users`);
+        setDialog(false);
+        setForm(initialForm);
+      } else {
+        toast.error(response.error || "Failed to create broadcast");
+      }
+    } catch (error) {
+      toast.error("Error creating broadcast");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const resendNotification = async (notification: NotificationRow) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setNotifications(prev => prev.map(n => 
-        n.id === notification.id 
-          ? { ...n, sent_status: "sent" as const }
-          : n
-      ));
-      toast.success("Notification resent");
+    try {
+      console.log('Resending notification:', notification);
+      const notificationId = notification._id || notification.id;
+      const response = await AdminApiService.resendNotification(notificationId);
+      if (response.success) {
+        setNotifications(prev => prev.map(n =>
+          (n._id === notificationId || n.id === notificationId)
+            ? { ...response.data }
+            : n
+        ));
+        toast.success("Notification resent");
+      } else {
+        toast.error(response.error || "Failed to resend notification");
+      }
+    } catch (error) {
+      toast.error("Error resending notification");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const archiveNotification = async (notificationId: string) => {
+  const archiveNotification = async (notification: NotificationRow) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setNotifications(prev => prev.map(n => 
-        n.id === notificationId 
-          ? { ...n, sent_status: "archived" as const }
-          : n
-      ));
-      toast.success("Notification archived");
+    try {
+      const notificationId = notification._id;
+      const response = await AdminApiService.archiveNotification(notificationId);
+      if (response.success) {
+        // Remove from active notifications
+        setNotifications(prev => prev.filter(n => n._id !== notificationId));
+        // Add to archived notifications
+        setArchivedNotifications(prev => [response.data, ...prev]);
+        toast.success("Notification archived");
+      } else {
+        toast.error(response.error || "Failed to archive notification");
+      }
+    } catch (error) {
+      toast.error("Error archiving notification");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const deleteNotification = async (notificationId: string) => {
+  const unarchiveNotification = async (notification: NotificationRow) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      toast.success("Notification deleted");
+    try {
+      const notificationId = notification._id;
+      const response = await AdminApiService.unarchiveNotification(notificationId);
+      if (response.success) {
+        // Remove from archived notifications
+        setArchivedNotifications(prev => prev.filter(n => n._id !== notificationId));
+        // Add to active notifications
+        setNotifications(prev => [response.data, ...prev]);
+        toast.success("Notification unarchived");
+      } else {
+        toast.error(response.error || "Failed to unarchive notification");
+      }
+    } catch (error) {
+      toast.error("Error unarchiving notification");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
+
+  const deleteNotification = async (notification: NotificationRow) => {
+    setNotificationToDelete(notification);
+    setDeleteDialog(true);
+  };
+
+  const confirmDeleteNotification = async () => {
+    if (!notificationToDelete) return;
+    
+    setIsLoading(true);
+    try {
+      const notificationId = notificationToDelete._id;
+      const response = await AdminApiService.deleteNotification(notificationId);
+      if (response.success) {
+        setNotifications(prev => prev.filter(n => n._id !== notificationId));
+        setArchivedNotifications(prev => prev.filter(n => n._id !== notificationId));
+        toast.success("Notification deleted");
+        setDeleteDialog(false);
+        setNotificationToDelete(null);
+      } else {
+        toast.error(response.error || "Failed to delete notification");
+      }
+    } catch (error) {
+      toast.error("Error deleting notification");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredNotifications = useMemo(
+    () => notifications.filter((notification) => {
+      if (!searchTerm) return true;
+      const searchLower = searchTerm.toLowerCase();
+      const title = notification.title?.toLowerCase() || '';
+      const message = notification.message?.toLowerCase() || '';
+      const type = notification.type?.toLowerCase() || '';
+      const userName = notification.user_id 
+        ? `${notification.user_id.first_name} ${notification.user_id.last_name}`.toLowerCase()
+        : '';
+      const userEmail = notification.user_id 
+        ? notification.user_id.email?.toLowerCase() || ''
+        : '';
+      
+      return title.includes(searchLower) || 
+             message.includes(searchLower) || 
+             type.includes(searchLower) || 
+             userName.includes(searchLower) || 
+             userEmail.includes(searchLower);
+    }),
+    [notifications, searchTerm]
+  );
 
   const sent = useMemo(
-    () => notifications.filter((notification) => notification.sent_status !== "archived").length,
-    [notifications]
+    () => notificationsPagination?.unread || filteredNotifications.filter((notification) => !notification.read).length,
+    [filteredNotifications, notificationsPagination]
   );
 
   return (
@@ -269,6 +319,7 @@ export default function CommunicationCenterPage() {
         <TabsList>
           <TabsTrigger value="broadcasts">Broadcasts</TabsTrigger>
           <TabsTrigger value="all">All Notifications</TabsTrigger>
+          <TabsTrigger value="archived">Archived ({archivedNotifications.length})</TabsTrigger>
           <TabsTrigger value="feedback">Beta Feedback ({feedbackList.length})</TabsTrigger>
         </TabsList>
 
@@ -303,39 +354,63 @@ export default function CommunicationCenterPage() {
         </TabsContent>
 
         <TabsContent value="all">
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="flex items-center justify-between mb-4">
+            <div className="relative">
+              <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+              <Input
+                placeholder="Search notifications..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 w-64"
+              />
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-lg border min-w-[1000px]">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
-                  <TableHead>Channel</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Read Status</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {notifications.map((notification) => {
-                  const isArchived = notification.sent_status === "archived";
+                {filteredNotifications.map((notification) => {
+                  const isRead = notification.read;
                   return (
                     <TableRow key={notification.id}>
-                      <TableCell>
-                        <div className="font-medium">{notification.title}</div>
-                        <div className="max-w-[320px] truncate text-xs text-muted-foreground">{notification.message}</div>
+                      <TableCell className="max-w-sm">
+                        <div className="font-medium text-sm mb-1">{notification.title}</div>
+                        <div className="text-xs text-muted-foreground max-w-xs break-words">{notification.message}</div>
                       </TableCell>
-                      <TableCell className="capitalize">{notification.channel}</TableCell>
-                      <TableCell>
-                        <Badge variant={notification.priority === "high" ? "destructive" : notification.priority === "medium" ? "secondary" : "outline"} className="capitalize">
-                          {notification.priority || "low"}
+                      <TableCell className="capitalize">
+                        <Badge variant="outline">
+                          {notification.type.replace(/_/g, " ")}
                         </Badge>
                       </TableCell>
+                      <TableCell className="py-3">
+                        <div className="text-sm font-medium mb-1">
+                          {notification.user_id && typeof notification.user_id === 'object' ?
+                            `${notification.user_id.first_name} ${notification.user_id.last_name}` :
+                            "Unknown User"
+                          }
+                        </div>
+                        <div className="text-xs text-muted-foreground break-all">
+                          {notification.user_id && typeof notification.user_id === 'object' ? notification.user_id.email : "—"}
+                        </div>
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={isArchived ? "secondary" : notification.sent_status === "sent" ? "default" : "outline"}>
-                          {notification.sent_status}
+                        <Badge variant={isRead ? "secondary" : "default"}>
+                          {isRead ? "Read" : "Unread"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{new Date(notification.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        <div>{format(new Date(notification.created_at), 'MMM d, yyyy')}</div>
+                        <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
                           <Button
@@ -349,8 +424,8 @@ export default function CommunicationCenterPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={isLoading || isArchived}
-                            onClick={() => archiveNotification(notification.id)}
+                            disabled={isLoading}
+                            onClick={() => archiveNotification(notification)}
                           >
                             <Archive className="mr-1 h-4 w-4" /> Archive
                           </Button>
@@ -359,7 +434,7 @@ export default function CommunicationCenterPage() {
                             size="sm"
                             className="text-destructive"
                             disabled={isLoading}
-                            onClick={() => deleteNotification(notification.id)}
+                            onClick={() => deleteNotification(notification)}
                           >
                             <Trash2 className="mr-1 h-4 w-4" /> Delete
                           </Button>
@@ -368,11 +443,149 @@ export default function CommunicationCenterPage() {
                     </TableRow>
                   );
                 })}
-                {notifications.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No notifications yet</TableCell></TableRow>
+                {filteredNotifications.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    {searchTerm ? `No notifications found for "${searchTerm}"` : "No notifications yet"}
+                  </TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className='mt-4'>
+            {/* Pagination Controls */}
+            {notificationsPagination && notificationsPagination.pages > 1 && (
+              <div className="flex items-center justify-between px-2">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((notificationPage - 1) * notificationsPerPage) + 1} to {Math.min(notificationPage * notificationsPerPage, filteredNotifications.length)} of {filteredNotifications.length} notifications
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadNotificationsPage(notificationPage - 1)}
+                    disabled={notificationPage <= 1 || isLoading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {notificationPage} of {notificationsPagination.pages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadNotificationsPage(notificationPage + 1)}
+                    disabled={notificationPage >= notificationsPagination.pages || isLoading}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <div className="overflow-x-auto rounded-lg border min-w-[1000px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {archivedNotifications.map((notification) => (
+                  <TableRow key={notification.id}>
+                    <TableCell className="max-w-sm">
+                      <div className="font-medium text-sm mb-1">{notification.title}</div>
+                      <div className="text-xs text-muted-foreground max-w-xs break-words">{notification.message}</div>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      <Badge variant="outline">
+                        {notification.type.replace(/_/g, " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="text-sm font-medium mb-1">
+                        {notification.user_id && typeof notification.user_id === 'object' ?
+                          `${notification.user_id.first_name} ${notification.user_id.last_name}` :
+                          "Unknown User"
+                        }
+                      </div>
+                      <div className="text-xs text-muted-foreground break-all">
+                        {notification.user_id && typeof notification.user_id === 'object' ? notification.user_id.email : "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <div>{format(new Date(notification.created_at), 'MMM d, yyyy')}</div>
+                      <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isLoading}
+                          onClick={() => unarchiveNotification(notification)}
+                        >
+                          <Archive className="mr-1 h-4 w-4" /> Unarchive
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          disabled={isLoading}
+                          onClick={() => deleteNotification(notification)}
+                        >
+                          <Trash2 className="mr-1 h-4 w-4" /> Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {archivedNotifications.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No archived notifications yet</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className='mt-4'>
+            {/* Pagination Controls */}
+            {archivedPagination && archivedPagination.pages > 1 && (
+              <div className="flex items-center justify-between px-2">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((archivedPage - 1) * notificationsPerPage) + 1} to {Math.min(archivedPage * notificationsPerPage, archivedNotifications.length)} of {archivedNotifications.length} archived notifications
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadArchivedPage(archivedPage - 1)}
+                    disabled={archivedPage <= 1 || isLoading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {archivedPage} of {archivedPagination.pages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadArchivedPage(archivedPage + 1)}
+                    disabled={archivedPage >= archivedPagination.pages || isLoading}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -464,6 +677,44 @@ export default function CommunicationCenterPage() {
             >
               Send Broadcast
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Notification</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete this notification? This action cannot be undone.
+            </p>
+            {notificationToDelete && (
+              <div className="p-3 bg-muted rounded-md">
+                <p className="font-medium text-sm">{notificationToDelete.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{notificationToDelete.message}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialog(false);
+                  setNotificationToDelete(null);
+                }}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteNotification}
+                disabled={isLoading}
+              >
+                Delete
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

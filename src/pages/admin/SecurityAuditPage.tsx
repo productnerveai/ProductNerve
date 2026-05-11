@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShieldAlert, ScrollText, Ban, AlertTriangle, Eye } from "lucide-react";
 import { useState } from "react";
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 export default function SecurityAuditPage() {
   const [logPage, setLogPage] = useState(0);
@@ -13,24 +15,33 @@ export default function SecurityAuditPage() {
   const { data: unauthorizedAttempts = [] } = useQuery({
     queryKey: ["admin-security-unauthorized"],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return [];
+      const response = await AdminApiService.getSecurityLogs();
+      if (response.success) {
+        return response.data.unauthorized_attempts || [];
+      }
+      throw new Error("Failed to load security logs");
     },
   });
 
   const { data: adminActions = [] } = useQuery({
     queryKey: ["admin-audit-logs"],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return [];
+      const response = await AdminApiService.getAuditLogs();
+      if (response.success) {
+        return response.data.admin_actions || [];
+      }
+      throw new Error("Failed to load audit logs");
     },
   });
 
   const { data: suspendedUsers = [] } = useQuery({
     queryKey: ["admin-suspended-users"],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return [];
+      const response = await AdminApiService.getSuspendedUsers();
+      if (response.success) {
+        return response.data.users || [];
+      }
+      throw new Error("Failed to load suspended users");
     },
   });
 

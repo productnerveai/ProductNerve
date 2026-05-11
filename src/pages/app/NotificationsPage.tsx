@@ -5,65 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bell, Check, CheckCheck, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
-
-// Dummy notifications data
-const dummyNotifications = [
-  // {
-  //   id: "notif1",
-  //   title: "Welcome to ProductNerve!",
-  //   message: "Get started by creating your first project and running it through our validation engine.",
-  //   type: "system",
-  //   priority: "high",
-  //   read_at: null,
-  //   created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  //   user_id: "user123",
-  //   link: "/app/projects"
-  // },
-  // {
-  //   id: "notif2",
-  //   title: "Phase 1 Complete!",
-  //   message: "Congratulations! Your venture validation is complete. View your scores and insights.",
-  //   type: "system",
-  //   priority: "medium",
-  //   read_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  //   created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  //   user_id: "user123",
-  //   link: "/app/projects/proj1/overview"
-  // },
-  // {
-  //   id: "notif3",
-  //   title: "New Feature: Product Studio",
-  //   message: "Check out our new Product Studio tools for generating user stories and PRDs.",
-  //   type: "info",
-  //   priority: "low",
-  //   read_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  //   created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-  //   user_id: "user123",
-  //   link: "/app/studio"
-  // },
-  // {
-  //   id: "notif4",
-  //   title: "Payment Reminder",
-  //   message: "Your Pro subscription is due for renewal in 7 days.",
-  //   type: "billing",
-  //   priority: "medium",
-  //   read_at: null,
-  //   created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  //   user_id: "user123",
-  //   link: "/app/billing"
-  // },
-  // {
-  //   id: "notif5",
-  //   title: "Phase 2 Ready",
-  //   message: "Your venture has passed Phase 1. Start Phase 2 to build your execution blueprint.",
-  //   type: "system",
-  //   priority: "high",
-  //   read_at: null,
-  //   created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  //   user_id: "user123",
-  //   link: "/app/projects/proj1"
-  // }
-];
+import NotificationApiService from "@/services/notificationApi";
+import { toast } from "sonner";
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -71,39 +14,75 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
-    // Simulate loading notifications
-    setTimeout(() => {
-      setNotifications(dummyNotifications);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    loadNotifications();
+  }, [filter, page]);
 
-  const markRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
-    );
+  const loadNotifications = async () => {
+    setIsLoading(true);
+    try {
+      const unreadOnly = filter === "unread";
+      const result = await NotificationApiService.getNotifications(page, 20, unreadOnly);
+      
+      if (result.success) {
+        if (page === 0) {
+          setNotifications(result.data.notifications);
+        } else {
+          setNotifications(prev => [...prev, ...result.data.notifications]);
+        }
+        setTotalPages(result.data.pagination.pages);
+      } else {
+        toast.error("Failed to load notifications");
+      }
+    } catch (error) {
+      toast.error("Error loading notifications");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const markAllRead = () => {
+  const markRead = async (id: string) => {
+    try {
+      console.log('Marking notification as read, ID:', id, 'Full notification:', notifications.find(n => n._id === id || n.id === id));
+      const result = await NotificationApiService.markAsRead(id);
+      if (result.success) {
+        setNotifications(prev => 
+          prev.map(n => (n._id === id || n.id === id) ? { ...n, read: true, read_at: new Date().toISOString() } : n)
+        );
+      }
+    } catch (error) {
+      toast.error("Failed to mark notification as read");
+    }
+  };
+
+  const markAllRead = async () => {
     setMarkingAll(true);
-    setTimeout(() => {
-      setNotifications(prev => 
-        prev.map(n => !n.read_at && n.user_id ? { ...n, read_at: new Date().toISOString() } : n)
-      );
+    try {
+      const result = await NotificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => 
+          prev.map(n => ({ ...n, read: true, read_at: new Date().toISOString() }))
+        );
+        toast.success("All notifications marked as read");
+      }
+    } catch (error) {
+      toast.error("Failed to mark all notifications as read");
+    } finally {
       setMarkingAll(false);
-    }, 1000);
+    }
   };
 
   const filtered = notifications.filter((n) => {
-    if (filter === "unread") return !n.read_at;
-    if (filter === "billing") return n.type === "billing";
-    if (filter === "system") return n.type === "info" || n.type === "system";
+    if (filter === "unread") return !n.read;
+    if (filter === "billing") return n.type === "billing" || n.type === "payment_received";
+    if (filter === "system") return n.type === "account_suspended" || n.type === "account_activated" || n.type === "account_deactivated" || n.type === "admin_promotion" || n.type === "access_granted" || n.type === "system_update";
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
@@ -149,17 +128,19 @@ export default function NotificationsPage() {
             <div className="space-y-1">
               {filtered.map((n) => (
                 <div
-                  key={n.id}
-                  className={`glass-card rounded-lg p-4 flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${!n.read_at ? "border-l-2 border-l-accent" : ""}`}
+                  key={n._id || n.id}
+                  className={`glass-card rounded-lg p-4 flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${!n.read ? "border-l-2 border-l-accent" : ""}`}
                   onClick={() => {
-                    if (!n.read_at && n.user_id) markRead(n.id);
+                    const notificationId = n._id || n.id;
+                    console.log('Clicked notification, ID:', notificationId, 'Full notification:', n);
+                    if (!n.read && notificationId) markRead(notificationId);
                     if (n.link) navigate(n.link);
                   }}
                 >
-                  <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${!n.read_at ? "bg-accent" : "bg-transparent"}`} />
+                  <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${!n.read ? "bg-accent" : "bg-transparent"}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm ${!n.read_at ? "font-semibold" : "font-medium text-muted-foreground"}`}>{n.title}</p>
+                      <p className={`text-sm ${!n.read ? "font-semibold" : "font-medium text-muted-foreground"}`}>{n.title}</p>
                       {getPriorityBadge((n as any).priority || "low")}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
@@ -169,12 +150,16 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {n.link && <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />}
-                    {!n.read_at && n.user_id && (
+                    {!n.read && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
-                        onClick={(e) => { e.stopPropagation(); markRead(n.id); }}
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          const notificationId = n._id || n.id;
+                          if (notificationId) markRead(notificationId); 
+                        }}
                       >
                         <Check className="h-3.5 w-3.5" />
                       </Button>

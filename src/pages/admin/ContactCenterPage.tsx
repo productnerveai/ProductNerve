@@ -11,108 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Eye, Send, Plus, MessageSquare, Bug, Lightbulb } from "lucide-react";
-
-// Generate dummy contact center data
-const generateDummyTickets = () => [
-  {
-    id: "ticket1",
-    name: "John Doe",
-    email: "john@example.com",
-    subject: "Login Issue",
-    message: "I'm having trouble logging into my account. The password reset link isn't working.",
-    inquiry_type: "technical",
-    priority: "high",
-    status: "open",
-    created_by_admin: false,
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    responded_at: null,
-    admin_response: null,
-  },
-  {
-    id: "ticket2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    subject: "Feature Request",
-    message: "Would it be possible to add a dark mode to the interface?",
-    inquiry_type: "feature",
-    priority: "medium",
-    status: "in_progress",
-    created_by_admin: false,
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    responded_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    admin_response: "We're considering this for a future release.",
-  },
-  {
-    id: "ticket3",
-    name: "Bob Wilson",
-    email: "bob@example.com",
-    subject: "Billing Question",
-    message: "How do I upgrade to the Pro plan?",
-    inquiry_type: "billing",
-    priority: "low",
-    status: "closed",
-    created_by_admin: false,
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    responded_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    admin_response: "You can upgrade from the billing page.",
-  },
-];
-
-const generateDummyReplies = () => [
-  {
-    id: "reply1",
-    ticket_id: "ticket1",
-    admin_id: "admin",
-    message: "I'm looking into your login issue. Can you try clearing your browser cache?",
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "reply2",
-    ticket_id: "ticket2",
-    admin_id: "admin",
-    message: "Thanks for the suggestion! We'll consider it for a future update.",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const generateDummyFeedback = () => [
-  {
-    id: "feedback1",
-    user_email: "user@example.com",
-    rating: 5,
-    comment: "Great platform! Very intuitive and helpful.",
-    feature: "ICP Builder",
-    feedback_type: "general",
-    title: "Great Experience",
-    description: "Great platform! Very intuitive and helpful.",
-    status: "open",
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "feedback2",
-    user_email: "test@example.com",
-    rating: 4,
-    comment: "The roadmap generator is amazing but could use more templates.",
-    feature: "Roadmap Generator",
-    feedback_type: "feature",
-    title: "Feature Request",
-    description: "The roadmap generator is amazing but could use more templates.",
-    status: "in_progress",
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "feedback3",
-    user_email: "feedback@example.com",
-    rating: 3,
-    comment: "User story generator needs improvement in formatting.",
-    feature: "User Story Generator",
-    feedback_type: "bug",
-    title: "Formatting Issue",
-    description: "User story generator needs improvement in formatting.",
-    status: "resolved",
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
+import { format, formatDistanceToNow } from "date-fns";
+import AdminApiService from "@/services/adminApi";
 
 export default function ContactCenterPage() {
   const [selected, setSelected] = useState<any>(null);
@@ -121,84 +21,135 @@ export default function ContactCenterPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [activeSection, setActiveSection] = useState<"tickets" | "feedback">("tickets");
   const [ticketForm, setTicketForm] = useState({
-    name: "", email: "", subject: "", message: "", inquiry_type: "general", priority: "medium",
+    name: "", email: "", subject: "", message: "", inquiry_type: "support", priority: "medium",
   });
-  const [tickets, setTickets] = useState(generateDummyTickets());
-  const [replies, setReplies] = useState(generateDummyReplies());
-  const [feedbackItems, setFeedbackItems] = useState(generateDummyFeedback());
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [replies, setReplies] = useState<any[]>([]);
+  const [feedbackItems, setFeedbackItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingReplies, setLoadingReplies] = useState(false);
 
   useEffect(() => {
-    // Simulate initial loading
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1000);
+    loadTickets();
+    loadFeedback();
   }, []);
+
+  const loadFeedback = async () => {
+    setIsLoading(true);
+    try {
+      const response = await AdminApiService.getAllTickets({ type: 'feedback' });
+      if (response.success) {
+        setFeedbackItems(response.data.tickets || []);
+      } else {
+        toast.error("Failed to load feedback");
+      }
+    } catch (error) {
+      toast.error("Error loading feedback");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadTickets = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Calling getAllTickets API...');
+      const response = await AdminApiService.getAllTickets();
+      console.log('API response:', response);
+      
+      if (response.success) {
+        console.log('Setting tickets from response.data.tickets:', response.data.tickets);
+        // Include ALL tickets - let users see everything in tickets section
+        // Feedback section can still show pure feedback items separately
+        setTickets(response.data.tickets);
+      } else {
+        console.log('API call failed:', response.error);
+        toast.error("Failed to load tickets");
+      }
+    } catch (error) {
+      console.log('API call error:', error);
+      toast.error("Error loading tickets");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const createTicket = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const newTicket = {
-        id: `ticket_${Date.now()}`,
-        name: ticketForm.name || "Admin Created",
-        email: ticketForm.email,
-        subject: ticketForm.subject,
-        message: ticketForm.message,
-        inquiry_type: ticketForm.inquiry_type,
+    try {
+      const response = await AdminApiService.createTicket({
+        title: ticketForm.subject,
+        description: ticketForm.message,
+        feedback_type: ticketForm.inquiry_type,
         priority: ticketForm.priority,
-        status: "open",
-        created_by_admin: true,
-        created_at: new Date().toISOString(),
-        responded_at: null,
-        admin_response: null,
-      };
-      
-      setTickets(prev => [newTicket, ...prev]);
-      toast.success("Ticket created");
-      setShowCreate(false);
-      setTicketForm({ name: "", email: "", subject: "", message: "", inquiry_type: "general", priority: "medium" });
+        user_email: ticketForm.email || undefined
+      });
+      if (response.success) {
+        // Reload both tickets and feedback to get fresh data
+        await loadTickets();
+        await loadFeedback();
+        toast.success("Ticket created");
+        setShowCreate(false);
+        setTicketForm({ name: "", email: "", subject: "", message: "", inquiry_type: "support", priority: "medium" });
+      } else {
+        toast.error(response.error || "Failed to create ticket");
+      }
+    } catch (error) {
+      toast.error("Error creating ticket");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const updateTicket = async ({ id, updates }: { id: string; updates: any }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setTickets(prev => prev.map(ticket => ticket.id === id ? { ...ticket, ...updates } : ticket));
-      toast.success("Ticket updated");
+    try {
+      if (updates.status) {
+        const response = await AdminApiService.updateTicketStatus(id, updates.status);
+        if (response.success) {
+          setTickets(prev => prev.map(ticket => ticket.id === id ? { ...ticket, ...response.data } : ticket));
+          toast.success("Ticket status updated");
+        } else {
+          toast.error(response.error || "Failed to update ticket");
+        }
+      }
+    } catch (error) {
+      toast.error("Error updating ticket");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const sendReply = async ({ ticketId, message }: { ticketId: string; message: string }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      const newReply = {
-        id: `reply_${Date.now()}`,
-        ticket_id: ticketId,
-        admin_id: "admin",
-        message,
-        created_at: new Date().toISOString(),
-      };
-      
-      setReplies(prev => [newReply, ...prev]);
-      
-      // Update ticket with admin response and status
-      setTickets(prev => prev.map(ticket => {
-        if (ticket.id === ticketId) {
-          return {
-            ...ticket,
-            admin_response: message,
-            responded_at: new Date().toISOString(),
-            status: "in_progress",
-          };
-        }
-        return ticket;
-      }));
-      
-      toast.success("Reply sent");
-      setResponse("");
+    try {
+      const response = await AdminApiService.replyToTicket(ticketId, message);
+      if (response.success) {
+        setReplies(prev => [response.data, ...prev]);
+        
+        // Update ticket with admin response
+        setTickets(prev => prev.map(ticket => {
+          if (ticket.id === ticketId) {
+            return {
+              ...ticket,
+              admin_response: message,
+              responded_at: new Date().toISOString(),
+              status: ticket.status === "open" ? "in_progress" : ticket.status,
+            };
+          }
+          return ticket;
+        }));
+        
+        toast.success("Reply sent");
+        setResponse("");
+      } else {
+        toast.error(response.error || "Failed to send reply");
+      }
+    } catch (error) {
+      toast.error("Error sending reply");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const ticket = tickets?.find(t => t.id === selected?.id);
@@ -207,7 +158,38 @@ export default function ContactCenterPage() {
   const open = tickets?.filter(t => t.status === "open").length || 0;
   const inProgress = tickets?.filter(t => t.status === "in_progress").length || 0;
   const resolved = tickets?.filter(t => t.status === "resolved").length || 0;
+  
+  // Debug logging
+  console.log('Current filter:', filter);
+  console.log('All tickets loaded:', tickets);
+  console.log('Total tickets:', total);
+  console.log('Resolved tickets:', resolved);
+  
   const filtered = filter === "all" ? tickets : tickets?.filter(t => t.status === filter);
+  console.log('Filtered tickets:', filtered);
+  const loadTicketReplies = async (ticketId: string) => {
+    setLoadingReplies(true);
+    try {
+      console.log('Loading replies for ticket:', ticketId);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/contacts/tickets/${ticketId}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      console.log('Ticket details response:', data);
+      
+      if (data.success) {
+        console.log('Setting replies:', data.data.replies);
+        setReplies(data.data.replies || []);
+      } else {
+        console.log('Failed to load ticket details:', data.error);
+      }
+    } catch (error) {
+      console.error('Error loading ticket replies:', error);
+    } finally {
+      setLoadingReplies(false);
+    }
+  };
+
   const getTicketReplies = (ticketId: string) => replies?.filter(r => r.ticket_id === ticketId) || [];
 
   const statusColor = (status: string) => {
@@ -288,15 +270,15 @@ export default function ContactCenterPage() {
           <TableBody>
             {filtered?.map(t => (
               <TableRow key={t.id}>
-                <TableCell className="font-medium">{t.name}</TableCell>
-                <TableCell className="text-sm">{t.email}</TableCell>
-                <TableCell className="text-sm max-w-[150px] truncate">{(t as any).subject || "—"}</TableCell>
-                <TableCell><Badge variant="outline">{t.inquiry_type || "general"}</Badge></TableCell>
+                <TableCell className="font-medium">{t.user?.first_name || "—"} {t.user?.last_name}</TableCell>
+                <TableCell className="text-sm">{t.user?.email || "—"}</TableCell>
+                <TableCell className="text-sm max-w-[150px] truncate">{t.title || "—"}</TableCell>
+                <TableCell><Badge variant="outline">{t.feedback_type || "general"}</Badge></TableCell>
                 <TableCell><Badge variant={priorityColor((t as any).priority || "medium")}>{(t as any).priority || "medium"}</Badge></TableCell>
                 <TableCell><Badge variant={statusColor(t.status)}>{t.status}</Badge></TableCell>
-                <TableCell className="text-sm text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{format(t.created_at, 'MMM d, yyyy')}</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="sm" onClick={() => { setSelected(t); setResponse(""); }}>
+                  <Button variant="ghost" size="sm" onClick={() => { setSelected(t); setResponse(""); loadTicketReplies(t.id); }}>
                     <Eye className="h-4 w-4 mr-1" /> View
                   </Button>
                 </TableCell>
@@ -336,11 +318,10 @@ export default function ContactCenterPage() {
                 <Select value={ticketForm.inquiry_type} onValueChange={v => setTicketForm(f => ({ ...f, inquiry_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="general">General Inquiry</SelectItem>
-                    <SelectItem value="bug">Bug</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
-                    <SelectItem value="support">Support</SelectItem>
-                    <SelectItem value="billing">Billing</SelectItem>
+                    <SelectItem value="support">Support Request</SelectItem>
+                    <SelectItem value="bug">Bug Report</SelectItem>
+                    <SelectItem value="feature">Feature Request</SelectItem>
+                    <SelectItem value="feedback">General Feedback</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -366,18 +347,18 @@ export default function ContactCenterPage() {
       {/* View Ticket Dialog */}
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
-          <DialogHeader><DialogTitle>Ticket from {selected?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Ticket from {selected?.user?.first_name || "—"} {selected?.user?.last_name}</DialogTitle></DialogHeader>
           {selected && (
             <div className="space-y-4">
               <div className="text-sm grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Email:</span> {selected.email}</div>
-                <div><span className="text-muted-foreground">Company:</span> {selected.company || "—"}</div>
-                <div><span className="text-muted-foreground">Type:</span> {selected.inquiry_type || "general"}</div>
+                <div><span className="text-muted-foreground">Email:</span> {selected.user?.email || "—"}</div>
+                <div><span className="text-muted-foreground">Company:</span> {selected.user?.company_name || "—"}</div>
+                <div><span className="text-muted-foreground">Type:</span> {selected.feedback_type || "general"}</div>
                 <div><span className="text-muted-foreground">Priority:</span> <Badge variant={priorityColor((selected as any).priority || "medium")}>{(selected as any).priority || "medium"}</Badge></div>
                 <div><span className="text-muted-foreground">Status:</span> <Badge variant={statusColor(selected.status)}>{selected.status}</Badge></div>
-                {(selected as any).subject && <div className="col-span-2"><span className="text-muted-foreground">Subject:</span> {(selected as any).subject}</div>}
+                {selected.title && <div className="col-span-2"><span className="text-muted-foreground">Subject:</span> {selected.title}</div>}
               </div>
-              <div className="p-3 rounded-lg bg-muted/50 text-sm">{selected.message}</div>
+              <div className="p-3 rounded-lg bg-muted/50 text-sm">{selected.description}</div>
 
               {getTicketReplies(selected.id).length > 0 && (
                 <div className="space-y-2">
@@ -385,7 +366,7 @@ export default function ContactCenterPage() {
                   {getTicketReplies(selected.id).map(r => (
                     <div key={r.id} className="p-2 rounded bg-primary/5 text-sm border-l-2 border-primary">
                       <p>{r.message}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">{new Date(r.created_at).toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{format(r.created_at, 'MMM d, yyyy • h:mm a')}</p>
                     </div>
                   ))}
                 </div>
@@ -441,7 +422,7 @@ export default function ContactCenterPage() {
                     <TableCell className="font-medium text-sm">{f.title}</TableCell>
                     <TableCell className="text-sm max-w-[200px] truncate">{f.description}</TableCell>
                     <TableCell><Badge variant="outline">{f.status}</Badge></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{new Date(f.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{format(f.created_at, 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <Select defaultValue={f.status} onValueChange={v => updateFeedbackStatus({ id: f.id, status: v })}>
                         <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>

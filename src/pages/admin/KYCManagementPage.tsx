@@ -9,90 +9,73 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ShieldCheck, Clock, XCircle, Eye, CheckCircle } from "lucide-react";
-
-// Generate dummy data
-const generateDummyKycRecords = () => [
-  {
-    id: "kyc1",
-    user_id: "user1",
-    company_name: "Tech Corp",
-    registration_number: "REG-2023-001",
-    status: "approved",
-    documents: ["passport.pdf", "certificate.pdf"],
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    reviewed_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-    reviewed_by: "admin",
-    rejection_reason: null
-  },
-  {
-    id: "kyc2",
-    user_id: "user2",
-    company_name: "Startup Inc",
-    registration_number: "REG-2023-002",
-    status: "pending",
-    documents: ["id_card.pdf", "proof_of_address.pdf"],
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    reviewed_at: null,
-    reviewed_by: null,
-    rejection_reason: null
-  },
-  {
-    id: "kyc3",
-    user_id: "user4",
-    company_name: "Design Co",
-    registration_number: "REG-2023-003",
-    status: "rejected",
-    documents: ["passport.pdf"],
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    reviewed_at: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString(),
-    reviewed_by: "admin",
-    rejection_reason: "Incomplete documentation"
-  },
-];
-
-const generateDummyProfiles = () => [
-  { id: "user1", name: "John Doe", email: "john@example.com" },
-  { id: "user2", name: "Jane Smith", email: "jane@example.com" },
-  { id: "user4", name: "Alice Johnson", email: "alice@example.com" },
-];
+import AdminApiService from "@/services/adminApi";
 
 export default function KYCManagementPage() {
   const [selected, setSelected] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [showRejectionInput, setShowRejectionInput] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [records, setRecords] = useState(generateDummyKycRecords());
-  const [profiles, setProfiles] = useState(generateDummyProfiles());
+  const [records, setRecords] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Simulate initial loading
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1000);
+    loadKycRecords();
   }, []);
+
+  const loadKycRecords = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Loading KYC records...');
+      const response = await AdminApiService.getAllKycSubmissions();
+      console.log('KYC API response:', response);
+      if (response.success) {
+        console.log('Setting KYC records from response.data.submissions:', response.data.submissions);
+        setRecords(response.data.submissions);
+      } else {
+        console.error("Failed to load KYC records:", response.error);
+        toast.error("Failed to load KYC records");
+      }
+    } catch (error) {
+      console.error("Error loading KYC records:", error);
+      toast.error("Error loading KYC records");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const updateKyc = async ({ id, updates }: { id: string; updates: any }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setRecords(prev => prev.map(r => r.id === id ? {
-        ...r,
-        ...updates,
-        reviewed_by: "admin",
-        reviewed_at: new Date().toISOString(),
-      } : r));
+    try {
+      let response;
+      if (updates.status === "approved") {
+        response = await AdminApiService.approveKyc(id, "");
+      } else if (updates.status === "rejected") {
+        response = await AdminApiService.rejectKyc(id, rejectionReason);
+      }
       
-      toast.success("KYC record updated");
-      setSelected(null);
-      setRejectionReason("");
+      if (response.success) {
+        setRecords(prev => prev.map(r => r.id === id ? { ...r, ...response.data } : r));
+        toast.success(`KYC record ${updates.status}`);
+        setSelected(null);
+        setRejectionReason("");
+      } else {
+        toast.error(response.error || "Failed to update KYC record");
+      }
+    } catch (error) {
+      toast.error("Error updating KYC record");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const getUser = (userId: string) => profiles?.find(p => p.id === userId);
   const total = records?.length || 0;
-  const pending = records?.filter(r => r.status === "pending").length || 0;
-  const approved = records?.filter(r => r.status === "approved").length || 0;
-  const rejected = records?.filter(r => r.status === "rejected").length || 0;
-  const filtered = filter === "all" ? records : records?.filter(r => r.status === filter);
+  const pending = records?.filter(r => r.profile_completion_status === "pending").length || 0;
+  const approved = records?.filter(r => r.profile_completion_status === "approved").length || 0;
+  const rejected = records?.filter(r => r.profile_completion_status === "rejected").length || 0;
+  const filtered = filter === "all" ? records : records?.filter(r => r.profile_completion_status === filter);
 
   return (
     <div className="space-y-6">
@@ -127,18 +110,20 @@ export default function KYCManagementPage() {
           </TableHeader>
           <TableBody>
             {filtered?.map(r => {
-              const user = getUser(r.user_id);
+              console.log('KYC Record:', r); // Debug log to see data structure
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.company_name || "—"}</TableCell>
-                  <TableCell className="text-sm">{user?.email || "—"}</TableCell>
+                  <TableCell className="text-sm">{r.email || "—"}</TableCell>
                   <TableCell className="text-sm">{r.registration_number || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "outline"}>
-                      {r.status}
+                    <Badge variant={r.profile_completion_status === "approved" ? "default" : r.profile_completion_status === "rejected" ? "destructive" : "outline"}>
+                      {r.profile_completion_status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {r.created_at ? new Date(r.created_at).toLocaleDateString() : "Invalid Date"}
+                  </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" onClick={() => { setSelected(r); setRejectionReason(""); }}>
                       <Eye className="h-4 w-4 mr-1" /> Review
@@ -161,7 +146,7 @@ export default function KYCManagementPage() {
           {selected && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-muted-foreground">User:</span> {getUser(selected.user_id)?.email}</div>
+                <div><span className="text-muted-foreground">User:</span> {selected.email || "—"}</div>
                 <div><span className="text-muted-foreground">Company:</span> {selected.company_name || "—"}</div>
                 <div><span className="text-muted-foreground">Reg #:</span> {selected.registration_number || "—"}</div>
                 <div><span className="text-muted-foreground">Phone:</span> {selected.phone || "—"}</div>
@@ -176,17 +161,38 @@ export default function KYCManagementPage() {
                 </div>
               )}
 
-              {selected.status === "pending" && (
+              {selected.profile_completion_status === "pending" && (
                 <div className="border-t pt-3 space-y-3">
                   <div className="flex gap-2">
                     <Button className="flex-1" onClick={() => updateKyc({ id: selected.id, updates: { status: "approved" } })}>
                       <CheckCircle className="h-4 w-4 mr-1" /> Approve
                     </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={() => setShowRejectionInput(!showRejectionInput)}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" /> Reject
+                    </Button>
                   </div>
-                  <Textarea placeholder="Rejection reason (required)..." value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} rows={3} />
-                  <Button variant="destructive" className="w-full" disabled={!rejectionReason} onClick={() => updateKyc({ id: selected.id, updates: { status: "rejected", rejection_reason: rejectionReason } })}>
-                    <XCircle className="h-4 w-4 mr-1" /> Reject
-                  </Button>
+                  
+                  {showRejectionInput && (
+                    <div className="space-y-3">
+                      <Textarea 
+                        placeholder="Rejection reason (required)..." 
+                        value={rejectionReason} 
+                        onChange={e => setRejectionReason(e.target.value)} 
+                        rows={3} 
+                      />
+                      <Button 
+                        variant="destructive" 
+                        className="w-full" 
+                        disabled={!rejectionReason} 
+                        onClick={() => updateKyc({ id: selected.id, updates: { status: "rejected", rejection_reason: rejectionReason } })}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" /> Confirm Rejection
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

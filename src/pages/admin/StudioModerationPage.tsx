@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Search, Trash2, Eye, Shield } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
+import AdminApiService from "@/services/adminApi";
 
 type ToolType = "prd_documents" | "user_stories" | "icp_profiles" | "experiments" | "growth_plans" | "roadmaps";
 
@@ -31,15 +32,21 @@ export default function StudioModerationPage() {
   const { data: items, isLoading } = useQuery({
     queryKey: ["admin-moderation", tool],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return [];
+      const response = await AdminApiService.getStudioModeration();
+      if (response.success) {
+        return response.data[tool] || [];
+      }
+      throw new Error("Failed to load moderation data");
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      // TODO: Replace with actual API call
-      console.log("Would delete item:", id);
+      const response = await AdminApiService.deleteStudioContent(tool, id);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to delete content");
+      }
+      return response.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-moderation", tool] });

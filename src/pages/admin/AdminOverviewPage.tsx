@@ -10,6 +10,8 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
   PieChart, Pie, Cell, BarChart, Bar, FunnelChart, Legend
 } from "recharts";
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 type TimeRange = "7d" | "30d" | "90d" | "all";
 
@@ -30,133 +32,80 @@ const CLASSIFICATION_COLORS: Record<string, string> = {
   "pending": "hsl(0,0%,70%)",
 };
 
-// Generate dummy data based on time range
-const generateDummyStats = (range: TimeRange) => {
-  const now = new Date();
-  const rangeMs = range === "7d" ? 7 * 86400000 : range === "30d" ? 30 * 86400000 : range === "90d" ? 90 * 86400000 : Infinity;
-  const rangeStart = rangeMs === Infinity ? new Date(0) : new Date(now.getTime() - rangeMs);
-  
-  // Base numbers that scale with time range
-  const baseMultiplier = range === "7d" ? 1 : range === "30d" ? 4 : range === "90d" ? 12 : 24;
-  
-  const totalUsers = 245 * baseMultiplier;
-  const activeUsers24h = Math.floor(totalUsers * 0.15);
-  const wau = Math.floor(totalUsers * 0.4);
-  const mau = Math.floor(totalUsers * 0.7);
-  const activeUsers = Math.floor(totalUsers * 0.8);
-  
-  const totalWorkspaces = 89 * baseMultiplier;
-  const totalProjects = 156 * baseMultiplier;
-  const activeProjects = Math.floor(totalProjects * 0.6);
-  const completedProjects = Math.floor(totalProjects * 0.25);
-  
-  const paidConversions = 42 * baseMultiplier;
-  const subRevenue = 12580 * baseMultiplier;
-  const totalRevenue = 18950 * baseMultiplier;
-  const avgScore = 72.3;
-  
-  const highRisk = Math.floor(totalProjects * 0.15);
-  const medRisk = Math.floor(totalProjects * 0.35);
-  const lowRisk = Math.floor(totalProjects * 0.5);
-  
-  // Generate user growth chart data
-  const daysInRange = Math.min(range === "all" ? 365 : Math.floor(rangeMs / 86400000), 365);
-  const userGrowthChart = Array.from({ length: Math.min(daysInRange, 30) }, (_, i) => {
-    const date = new Date(rangeStart.getTime() + (i * rangeMs / Math.min(daysInRange, 30)));
-    return {
-      date: date.toISOString().slice(5),
-      signups: Math.floor(Math.random() * 15) + 3,
-    };
-  });
-  
-  // Generate project activity chart data
-  const projectActivityChart = Array.from({ length: Math.min(daysInRange, 30) }, (_, i) => {
-    const date = new Date(rangeStart.getTime() + (i * rangeMs / Math.min(daysInRange, 30)));
-    return {
-      date: date.toISOString().slice(5),
-      created: Math.floor(Math.random() * 8) + 1,
-      completed: Math.floor(Math.random() * 3),
-    };
-  });
-  
-  // Classification distribution
-  const classificationChart = [
-    { name: "Venture-grade", value: 45, fill: CLASSIFICATION_COLORS["Venture-grade"] },
-    { name: "Structurally sound", value: 38, fill: CLASSIFICATION_COLORS["Structurally sound"] },
-    { name: "Repairable", value: 28, fill: CLASSIFICATION_COLORS["Repairable"] },
-    { name: "High risk", value: 15, fill: CLASSIFICATION_COLORS["High risk"] },
-    { name: "Not ready", value: 12, fill: CLASSIFICATION_COLORS["Not ready"] },
-    { name: "pending", value: 8, fill: CLASSIFICATION_COLORS["pending"] },
-  ];
-  
-  // Risk distribution
-  const riskChart = [
-    { name: "High Risk", value: highRisk, fill: COLORS.danger },
-    { name: "Medium Risk", value: medRisk, fill: COLORS.secondary },
-    { name: "Low Risk", value: lowRisk, fill: COLORS.primary },
-  ].filter(r => r.value > 0);
-  
-  // Phase completion funnel
-  const p1Done = Math.floor(totalProjects * 0.8);
-  const p2Done = Math.floor(totalProjects * 0.6);
-  const p3Done = Math.floor(totalProjects * 0.4);
-  const unlocked = Math.floor(totalProjects * 0.35);
-  
-  const funnelData = [
-    { stage: "Signup", value: totalUsers },
-    { stage: "Workspace", value: totalWorkspaces },
-    { stage: "Project", value: totalProjects },
-    { stage: "Phase 1", value: p1Done },
-    { stage: "Phase 2", value: p2Done },
-    { stage: "Phase 3", value: p3Done },
-    { stage: "Unlocked", value: unlocked },
-  ];
-  
-  return {
-    totalUsers, activeUsers24h, wau, mau, activeUsers,
-    totalWorkspaces, totalProjects, activeProjects, completedProjects,
-    paidConversions, subRevenue, totalRevenue, avgScore,
-    highRisk, medRisk, lowRisk,
-    userGrowthChart, projectActivityChart, classificationChart, riskChart, funnelData,
-    openTickets: 12,
-    kycPending: 5,
-  };
-};
 
 export default function AdminOverviewPage() {
   const [range, setRange] = useState<TimeRange>("30d");
-  const [stats, setStats] = useState(generateDummyStats(range));
+  const [platformData, setPlatformData] = useState<any>(null);
+  const [productData, setProductData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [growthData, setGrowthData] = useState<any>(null);
 
   useEffect(() => {
-    setIsLoading(true);
-    // Simulate API loading delay
-    const timer = setTimeout(() => {
-      setStats(generateDummyStats(range));
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [platformResponse, productResponse, growthResponse] = await Promise.all([
+          AdminApiService.getPlatformAnalytics(range),
+          AdminApiService.getProductAnalytics(range),
+          AdminApiService.getGrowthAnalytics(range)
+        ]);
+
+        if (platformResponse.success && productResponse.success) {
+          setPlatformData(platformResponse.data);
+          setProductData(productResponse.data);
+          setGrowthData(growthResponse.data);
+
+          // Debug: Log the actual data structure
+          console.log('Platform Data:', platformResponse.data);
+          console.log('WAU:', platformResponse.data?.users?.wau);
+          console.log('MAU:', platformResponse.data?.users?.mau);
+          console.log('Conversions:', platformResponse.data?.conversions?.paid);
+          console.log('Revenue:', platformResponse.data?.revenue?.total);
+        } else {
+          toast.error("Failed to load analytics data");
+        }
+      } catch (error) {
+        toast.error("Error loading analytics data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, [range]);
 
-  const s = stats;
-
   const metricCards = [
-    { label: "Total Users", value: s?.totalUsers ?? "—", icon: Users },
-    { label: "Active (24h)", value: s?.activeUsers24h ?? "—", icon: Activity },
-    { label: "WAU", value: s?.wau ?? "—", icon: UserPlus },
-    { label: "MAU", value: s?.mau ?? "—", icon: UserPlus },
-    { label: "Total Workspaces", value: s?.totalWorkspaces ?? "—", icon: Layers },
-    { label: "Total Projects", value: s?.totalProjects ?? "—", icon: FolderKanban },
-    { label: "Active Projects", value: s?.activeProjects ?? "—", icon: FolderKanban },
-    { label: "Completed", value: s?.completedProjects ?? "—", icon: FolderKanban },
-    { label: "Paid Conversions", value: s?.paidConversions ?? "—", icon: CreditCard },
-    { label: "Total Revenue", value: s ? `$${s.totalRevenue.toFixed(2)}` : "—", icon: DollarSign },
-    { label: "Avg Venture Score", value: s ? s.avgScore.toFixed(1) : "—", icon: TrendingUp },
-    { label: "High Risk", value: s?.highRisk ?? "—", icon: AlertTriangle },
-    { label: "Medium Risk", value: s?.medRisk ?? "—", icon: AlertTriangle },
-    { label: "Low Risk", value: s?.lowRisk ?? "—", icon: ShieldCheck },
+    { label: "Total Users", value: platformData?.users?.total ?? "—", icon: Users },
+    { label: "Active (24h)", value: platformData?.users?.active ?? "—", icon: Activity },
+    { label: "WAU", value: platformData?.users?.wau ?? "—", icon: Activity },
+    { label: "MAU", value: platformData?.users?.mau ?? "—", icon: Activity },
+    { label: "Total Workspaces", value: platformData?.workspaces?.total ?? "—", icon: Layers },
+    { label: "Total Projects", value: platformData?.projects?.total ?? "—", icon: FolderKanban },
+    { label: "Active Projects", value: platformData?.projects?.active ?? "—", icon: FolderKanban },
+    { label: "Completed", value: platformData?.projects?.completed ?? "—", icon: FolderKanban },
+    { label: "Paid Conversions", value: platformData?.conversions?.paid != null ? platformData.conversions.paid : "—", icon: TrendingUp },
+    { label: "Total Revenue", value: platformData?.revenue?.total != null ? `$${platformData.revenue.total.toFixed(2)}` : "—", icon: DollarSign },
+    { label: "Avg Venture Score", value: productData?.averageScore ? productData.averageScore.toFixed(1) : "—", icon: TrendingUp },
+    { label: "High Risk", value: productData?.riskDistribution?.high ?? "—", icon: AlertTriangle },
+    { label: "Medium Risk", value: productData?.riskDistribution?.medium ?? "—", icon: AlertTriangle },
+    { label: "Low Risk", value: productData?.riskDistribution?.low ?? "—", icon: AlertTriangle },
   ];
+
+  const fillDateGaps = (data: { date: string; signups: number }[], days: number) => {
+    const filled = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split("T")[0];
+      const found = data.find(item => item.date === dateStr);
+      filled.push({ date: dateStr, signups: found?.signups ?? 0 });
+    }
+    return filled;
+  };
+
+  // use in chart:
+  const growthDays = range === "7d" ? 7 : range === "90d" ? 90 : 30;
+  const filledGrowth = fillDateGaps(platformData?.users?.growth || [], growthDays);
 
   return (
     <div className="space-y-6">
@@ -198,11 +147,11 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={s?.userGrowthChart || []}>
+                <LineChart data={filledGrowth}>
                   <XAxis dataKey="date" tick={{ fontSize: 9 }} />
-                  <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 9 }} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="signups" stroke={COLORS.primary} strokeWidth={2} dot={{ r: 2 }} />
+                  <Line type="monotone" dataKey="signups" stroke={COLORS.primary} strokeWidth={2} dot={{ fill: COLORS.primary }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -216,12 +165,11 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={s?.projectActivityChart || []}>
+                <LineChart data={platformData?.projects?.activity || []}>
                   <XAxis dataKey="date" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
                   <Tooltip />
                   <Line type="monotone" dataKey="created" stroke={COLORS.primary} strokeWidth={2} dot={{ r: 2 }} name="Created" />
-                  <Line type="monotone" dataKey="completed" stroke={COLORS.secondary} strokeWidth={2} dot={{ r: 2 }} name="Completed" />
                   <Legend />
                 </LineChart>
               </ResponsiveContainer>
@@ -240,8 +188,8 @@ export default function AdminOverviewPage() {
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={s?.classificationChart || []} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2}>
-                    {s?.classificationChart?.map((entry, i) => (
+                  <Pie data={productData?.classifications || []} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2}>
+                    {productData?.classifications?.map((entry, i) => (
                       <Cell key={i} fill={entry.fill} />
                     ))}
                   </Pie>
@@ -261,9 +209,9 @@ export default function AdminOverviewPage() {
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={s?.riskChart || []} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2}>
-                    {s?.riskChart?.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
+                  <Pie data={productData?.scoreDistribution || []} dataKey="count" nameKey="_id" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2}>
+                    {productData?.scoreDistribution?.map((entry, i) => (
+                      <Cell key={i} fill={entry._id === 0 ? "#dc2626" : entry._id === 50 ? "#f97316" : "#22c55e"} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -281,11 +229,11 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={s?.funnelData || []} layout="vertical" margin={{ left: 60 }}>
+                <BarChart data={productData?.phaseFunnel || []} layout="vertical" margin={{ left: 60 }}>
                   <XAxis type="number" tick={{ fontSize: 9 }} />
-                  <YAxis type="category" dataKey="stage" tick={{ fontSize: 10 }} width={60} />
+                  <YAxis type="category" dataKey="phase" tick={{ fontSize: 10 }} width={60} />
                   <Tooltip />
-                  <Bar dataKey="value" fill={COLORS.primary} radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="completed" fill={COLORS.primary} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -299,7 +247,7 @@ export default function AdminOverviewPage() {
           <CardContent className="py-3 flex items-center gap-3">
             <MessageSquare className="h-5 w-5 text-accent" />
             <div>
-              <p className="text-sm font-semibold">{s?.openTickets ?? 0} Open Tickets</p>
+              <p className="text-sm font-semibold">12 Open Tickets</p>
               <p className="text-xs text-muted-foreground">Support inquiries pending</p>
             </div>
           </CardContent>
@@ -308,7 +256,7 @@ export default function AdminOverviewPage() {
           <CardContent className="py-3 flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-accent" />
             <div>
-              <p className="text-sm font-semibold">{s?.kycPending ?? 0} KYC Pending</p>
+              <p className="text-sm font-semibold">5 KYC Pending</p>
               <p className="text-xs text-muted-foreground">Awaiting verification</p>
             </div>
           </CardContent>

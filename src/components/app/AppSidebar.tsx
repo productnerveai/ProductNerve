@@ -54,8 +54,12 @@ export default function AppSidebar() {
   const { activeWorkspace } = useWorkspace();
   const [studioOpen, setStudioOpen] = useState(location.pathname.startsWith("/app/studio"));
 
-  // Check if user has admin access
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  // Check if user has admin access - include all admin roles
+  const isAdmin = user?.role === 'admin' || 
+                 user?.role === 'product_analyst' || 
+                 user?.role === 'support_specialist' || 
+                 user?.role === 'growth_analyst' ||
+                 user?.admin_role; // Check both role and admin_role fields
 
   const handleSignOut = async () => {
     await logout();
@@ -190,7 +194,7 @@ export default function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <Link to="/admin">
                       <Shield className="h-4 w-4" />
-                      <span>Super Admin</span>
+                      <span>Admin Dashboard</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

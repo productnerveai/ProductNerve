@@ -8,6 +8,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import TrackingProvider from "@/components/TrackingProvider";
+// import CookieConsentBanner from "./components/CookieConsentBanner";
 
 // Marketing
 import MarketingLayout from "@/components/marketing/MarketingLayout";
@@ -88,90 +89,91 @@ const App = () => (
               <ProjectProvider>
                 <TrackingProvider>
                   <Routes>
-                {/* Marketing */}
-                <Route element={<MarketingLayout />}>
-                  <Route path="/" element={<AuthRedirect><Homepage /></AuthRedirect>} />
-                  {/* <Route path="/pricing" element={<PricingPage />} /> */}
-                  <Route path="/contact" element={<ContactPage />} />
-                  <Route path="/blog" element={<BlogPage />} />
-                  <Route path="/blog/:slug" element={<BlogPostPage />} />
-                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                  <Route path="/terms-and-conditions" element={<TermsPage />} />
-                  <Route path="/terms" element={<Navigate to="/terms-and-conditions" replace />} />
-                  <Route path="/data-deletion" element={<DataDeletionPolicyPage />} />
-                  <Route path="/social-media-policy" element={<SocialMediaPolicyPage />} />
-                </Route>
+                    {/* Marketing */}
+                    <Route element={<MarketingLayout />}>
+                      <Route path="/" element={<AuthRedirect><Homepage /></AuthRedirect>} />
+                      {/* <Route path="/pricing" element={<PricingPage />} /> */}
+                      <Route path="/contact" element={<ContactPage />} />
+                      <Route path="/blog" element={<BlogPage />} />
+                      <Route path="/blog/:slug" element={<BlogPostPage />} />
+                      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                      <Route path="/terms-and-conditions" element={<TermsPage />} />
+                      <Route path="/terms" element={<Navigate to="/terms-and-conditions" replace />} />
+                      <Route path="/data-deletion" element={<DataDeletionPolicyPage />} />
+                      <Route path="/social-media-policy" element={<SocialMediaPolicyPage />} />
+                    </Route>
 
-                {/* Redirects for removed pages */}
-                <Route path="/about" element={<Navigate to="/" replace />} />
-                <Route path="/solutions" element={<Navigate to="/" replace />} />
+                    {/* Redirects for removed pages */}
+                    <Route path="/about" element={<Navigate to="/" replace />} />
+                    <Route path="/solutions" element={<Navigate to="/" replace />} />
 
-                {/* Auth */}
-                <Route path="/login" element={<AuthRedirect><LoginPage /></AuthRedirect>} />
-                <Route path="/signup" element={<AuthRedirect><SignupPage /></AuthRedirect>} />
-                <Route path="/verify-email" element={<VerifyEmailPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    {/* Auth */}
+                    <Route path="/login" element={<AuthRedirect><LoginPage /></AuthRedirect>} />
+                    <Route path="/signup" element={<AuthRedirect><SignupPage /></AuthRedirect>} />
+                    <Route path="/verify-email" element={<VerifyEmailPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-                {/* 403 Forbidden */}
-                <Route path="/forbidden" element={<ForbiddenPage />} />
+                    {/* 403 Forbidden */}
+                    <Route path="/forbidden" element={<ForbiddenPage />} />
 
-                {/* Protected App */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/app" element={<AppLayout />}>
-                    <Route index element={<DashboardPage />} />
-                    <Route path="projects" element={<ProjectsPage />} />
-                    <Route path="projects/:projectId" element={<ProjectDetailPage />} />
-                    <Route path="projects/:projectId/overview" element={<ProjectOverviewPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route path="notifications" element={<NotificationsPage />} />
-                    <Route path="billing" element={<BillingPage />} />
-                    <Route path="support" element={<SupportInboxPage />} />
-                    <Route path="studio/icp-builder" element={<ICPBuilderPage />} />
-                    <Route path="studio/icp-builder/:icpId" element={<ICPBuilderPage />} />
-                    <Route path="studio/experiment-engine" element={<ExperimentEnginePage />} />
-                    <Route path="studio/experiment-engine/:experimentId" element={<ExperimentEnginePage />} />
-                    <Route path="studio/growth-engine" element={<GrowthEnginePage />} />
-                    <Route path="studio/growth-engine/:growthId" element={<GrowthEnginePage />} />
-                    <Route path="studio/roadmap-generator" element={<RoadmapGeneratorPage />} />
-                    <Route path="studio/roadmap-generator/:roadmapId" element={<RoadmapGeneratorPage />} />
-                    <Route path="studio/user-stories" element={<UserStoryGeneratorPage />} />
-                    <Route path="studio/user-stories/:storyId" element={<UserStoryGeneratorPage />} />
-                    <Route path="studio/prd-generator" element={<PRDGeneratorPage />} />
-                    <Route path="studio/prd-generator/:prdId" element={<PRDGeneratorPage />} />
-                    <Route path="studio/artifacts" element={<StudioArtifactsPage />} />
-                  </Route>
-                </Route>
+                    {/* Protected App */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route path="/app" element={<AppLayout />}>
+                        <Route index element={<DashboardPage />} />
+                        <Route path="projects" element={<ProjectsPage />} />
+                        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
+                        <Route path="projects/:projectId/overview" element={<ProjectOverviewPage />} />
+                        <Route path="settings" element={<SettingsPage />} />
+                        <Route path="notifications" element={<NotificationsPage />} />
+                        <Route path="billing" element={<BillingPage />} />
+                        <Route path="support" element={<SupportInboxPage />} />
+                        <Route path="studio/icp-builder" element={<ICPBuilderPage />} />
+                        <Route path="studio/icp-builder/:icpId" element={<ICPBuilderPage />} />
+                        <Route path="studio/experiment-engine" element={<ExperimentEnginePage />} />
+                        <Route path="studio/experiment-engine/:experimentId" element={<ExperimentEnginePage />} />
+                        <Route path="studio/growth-engine" element={<GrowthEnginePage />} />
+                        <Route path="studio/growth-engine/:growthId" element={<GrowthEnginePage />} />
+                        <Route path="studio/roadmap-generator" element={<RoadmapGeneratorPage />} />
+                        <Route path="studio/roadmap-generator/:roadmapId" element={<RoadmapGeneratorPage />} />
+                        <Route path="studio/user-stories" element={<UserStoryGeneratorPage />} />
+                        <Route path="studio/user-stories/:storyId" element={<UserStoryGeneratorPage />} />
+                        <Route path="studio/prd-generator" element={<PRDGeneratorPage />} />
+                        <Route path="studio/prd-generator/:prdId" element={<PRDGeneratorPage />} />
+                        <Route path="studio/artifacts" element={<StudioArtifactsPage />} />
+                      </Route>
+                    </Route>
 
-                {/* Admin Dashboard */}
-                <Route element={<AdminProtectedRoute />}>
-                  <Route path="/admin" element={<AdminLayout />}>
-                    <Route index element={<AdminOverviewPage />} />
-                    <Route path="platform-analytics" element={<PlatformAnalyticsPage />} />
-                    <Route path="product-analytics" element={<ProductAnalyticsPage />} />
-                    <Route path="growth-analytics" element={<GrowthAnalyticsPage />} />
-                    <Route path="users" element={<UserManagementPage />} />
-                    <Route path="workspaces" element={<WorkspaceManagementPage />} />
-                    <Route path="kyc" element={<KYCManagementPage />} />
-                    <Route path="billing" element={<AdminBillingPage />} />
-                    <Route path="contacts" element={<ContactCenterPage />} />
-                    <Route path="communications" element={<CommunicationCenterPage />} />
-                    <Route path="content" element={<ContentManagementPage />} />
-                    <Route path="studio-analytics" element={<StudioAnalyticsPage />} />
-                    <Route path="studio-content" element={<StudioContentPage />} />
-                    {/* <Route path="studio-ai" element={<StudioAIMonitoringPage />} /> */}
-                    {/* <Route path="studio-activity" element={<StudioActivityPage />} /> */}
-                    {/* <Route path="studio-moderation" element={<StudioModerationPage />} /> */}
-                    {/* <Route path="security" element={<SecurityAuditPage />} /> */}
-                    {/* <Route path="settings" element={<AdminSettingsPage />} /> */}
-                  </Route>
-                </Route>
+                    {/* Admin Dashboard */}
+                    <Route element={<AdminProtectedRoute />}>
+                      <Route path="/admin" element={<AdminLayout />}>
+                        <Route index element={<AdminOverviewPage />} />
+                        <Route path="platform-analytics" element={<PlatformAnalyticsPage />} />
+                        <Route path="product-analytics" element={<ProductAnalyticsPage />} />
+                        <Route path="growth-analytics" element={<GrowthAnalyticsPage />} />
+                        <Route path="users" element={<UserManagementPage />} />
+                        <Route path="workspaces" element={<WorkspaceManagementPage />} />
+                        <Route path="kyc" element={<KYCManagementPage />} />
+                        <Route path="billing" element={<AdminBillingPage />} />
+                        <Route path="contacts" element={<ContactCenterPage />} />
+                        <Route path="communications" element={<CommunicationCenterPage />} />
+                        <Route path="content" element={<ContentManagementPage />} />
+                        <Route path="studio-analytics" element={<StudioAnalyticsPage />} />
+                        <Route path="studio-content" element={<StudioContentPage />} />
+                        {/* <Route path="studio-ai" element={<StudioAIMonitoringPage />} /> */}
+                        {/* <Route path="studio-activity" element={<StudioActivityPage />} /> */}
+                        {/* <Route path="studio-moderation" element={<StudioModerationPage />} /> */}
+                        {/* <Route path="security" element={<SecurityAuditPage />} /> */}
+                        {/* <Route path="settings" element={<AdminSettingsPage />} /> */}
+                      </Route>
+                    </Route>
 
-                {/* <Route path="*" element={<NotFound />} /> */}
-              </Routes>
+                    {/* <Route path="*" element={<NotFound />} /> */}
+                  </Routes>
                 </TrackingProvider>
               </ProjectProvider>
             </WorkspaceProvider>
+            {/* <CookieConsentBanner /> */}
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

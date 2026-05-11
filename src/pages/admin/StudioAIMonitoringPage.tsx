@@ -4,6 +4,8 @@ import { Cpu, Activity, AlertTriangle, Zap } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 const FUNC_LABELS: Record<string, string> = {
   "prd-report": "PRD Generator",
@@ -25,8 +27,11 @@ export default function StudioAIMonitoringPage() {
   const { data: aiLogs } = useQuery({
     queryKey: ["admin-ai-logs-all"],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return [];
+      const response = await AdminApiService.getStudioAIMonitoring();
+      if (response.success) {
+        return response.data.ai_logs || [];
+      }
+      throw new Error("Failed to load AI monitoring data");
     },
   });
 

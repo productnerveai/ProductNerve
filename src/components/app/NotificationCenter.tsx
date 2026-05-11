@@ -1,63 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-
-// Dummy notifications data
-const dummyNotifications = [
-  // {
-  //   id: "1",
-  //   title: "New product launch",
-  //   message: "Check out our latest product features and improvements",
-  //   created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-  //   read_at: null,
-  //   user_id: "user1",
-  //   priority: "high",
-  //   link: "/app/products"
-  // },
-  // {
-  //   id: "2",
-  //   title: "System update",
-  //   message: "System maintenance scheduled for tonight at 11 PM",
-  //   created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-  //   read_at: null,
-  //   user_id: "user1",
-  //   priority: "medium",
-  //   link: null
-  // },
-  // {
-  //   id: "3",
-  //   title: "Welcome to ProductNerve",
-  //   message: "Get started with our quick onboarding guide",
-  //   created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-  //   read_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-  //   user_id: "user1",
-  //   priority: "low",
-  //   link: "/app/onboarding"
-  // }
-];
+import NotificationApiService from "@/services/notificationApi";
 
 export default function NotificationCenter() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState(dummyNotifications);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const markRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
-    );
+  useEffect(() => {
+    if (open) {
+      loadNotifications();
+    }
+  }, [open]);
+
+  const loadNotifications = async () => {
+    setIsLoading(true);
+    try {
+      const result = await NotificationApiService.getNotifications(0, 15, false);
+      if (result.success) {
+        setNotifications(result.data.notifications);
+      }
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const markAllRead = () => {
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, read_at: new Date().toISOString() }))
-    );
+  const markRead = async (id: string) => {
+    try {
+      console.log('Marking notification as read, ID:', id, 'Full notification:', notifications.find(n => n._id === id || n.id === id));
+      const result = await NotificationApiService.markAsRead(id);
+      if (result.success) {
+        setNotifications(prev => 
+          prev.map(n => (n._id === id || n.id === id) ? { ...n, read: true, read_at: new Date().toISOString() } : n)
+        );
+      }
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
   };
 
-  const unreadCount = notifications.filter(n => !n.read_at).length;
+  const markAllRead = async () => {
+    try {
+      const result = await NotificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => 
+          prev.map(n => ({ ...n, read: true, read_at: new Date().toISOString() }))
+        );
+      }
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -109,7 +112,12 @@ export default function NotificationCenter() {
           </div>
         </div>
         <ScrollArea className="max-h-[400px]">
-          {notifications.length === 0 ? (
+          {isLoading ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              <div className="h-4 w-4 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              Loading notifications...
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               No notifications yet
             </div>
@@ -117,19 +125,40 @@ export default function NotificationCenter() {
             <div className="divide-y divide-border">
               {notifications.slice(0, 15).map((n) => (
                 <button
-                  key={n.id}
-                  className={`w-full text-left p-3 hover:bg-muted/50 transition-colors flex gap-3 ${!n.read_at ? "bg-primary/[0.03]" : ""}`}
+                  key={n._id || n.id}
+                  className={`w-full text-left p-3 hover:bg-muted/50 transition-colors flex gap-3 ${!n.read ? "bg-primary/[0.03]" : ""}`}
                   onClick={() => {
-                    if (!n.read_at && n.user_id) markRead(n.id);
+                    const notificationId = n._id || n.id;
+                    console.log('Clicked notification, ID:', notificationId, 'Full notification:', n);
+                    if (!n.read && notificationId) markRead(notificationId);
                     if (n.link) { setOpen(false); navigate(n.link); }
                   }}
                 >
-                  <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${!n.read_at ? getPriorityColor((n as any).priority || "low") : "bg-transparent"}`} />
+                  <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${!n.read ? getPriorityColor((n as any).priority || "low") : "bg-transparent"}`} />
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm leading-tight ${!n.read_at ? "font-semibold" : "font-medium text-muted-foreground"}`}>
+                    <p 
+                      className={`text-sm leading-tight ${!n.read ? "font-semibold" : "font-medium text-muted-foreground"}`}
+                      style={{ 
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}
+                    >
                       {n.title}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.message}</p>
+                    <p 
+                      className="text-xs text-muted-foreground mt-0.5 break-words"
+                      style={{ 
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {n.message}
+                    </p>
                     <p className="text-[11px] text-muted-foreground/70 mt-1">
                       {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                     </p>

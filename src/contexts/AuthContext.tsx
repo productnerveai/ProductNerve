@@ -20,6 +20,20 @@ interface User {
   report_access: boolean;
   tool_access: boolean;
   role: string;
+  admin_role?: string;
+  admin_permissions?: {
+    can_manage_users: boolean;
+    can_manage_billing: boolean;
+    can_view_analytics: boolean;
+    can_manage_workspaces: boolean;
+    can_view_kyc: boolean;
+    can_view_contacts: boolean;
+    can_view_communications: boolean;
+    can_manage_content: boolean;
+    can_manage_settings: boolean;
+    can_view_security: boolean;
+    can_promote_to_admin: boolean;
+  };
   email_verified: boolean;
   user_status: string;
   created_at: string;

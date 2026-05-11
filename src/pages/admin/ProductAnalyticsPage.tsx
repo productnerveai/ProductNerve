@@ -5,100 +5,35 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   LineChart, Line, PieChart, Pie, Legend
 } from "recharts";
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 type TimeRange = "7d" | "30d" | "90d" | "all";
 const COLORS = ["hsl(182,72%,20%)", "hsl(23,80%,52%)", "hsl(182,30%,60%)", "hsl(0,72%,51%)", "hsl(182,50%,45%)"];
 
-// Generate dummy analytics data based on time range
-const generateDummyAnalytics = (range: TimeRange) => {
-  const baseMultiplier = range === "7d" ? 1 : range === "30d" ? 4 : range === "90d" ? 12 : 24;
-  
-  const totalUsers = 245 * baseMultiplier;
-  const dau = Math.floor(totalUsers * 0.15);
-  const wau = Math.floor(totalUsers * 0.4);
-  const mau = Math.floor(totalUsers * 0.7);
-  
-  const totalProjects = 156 * baseMultiplier;
-  const completed = Math.floor(totalProjects * 0.25);
-  const abandoned = Math.floor(totalProjects * 0.1);
-  const unlocked = Math.floor(totalProjects * 0.35);
-  const locked = totalProjects - unlocked;
-  
-  // Generate project chart data
-  const daysInRange = Math.min(range === "all" ? 365 : Math.floor((range === "7d" ? 7 : range === "30d" ? 30 : 90)), 30);
-  const projectChart = Array.from({ length: daysInRange }, (_, i) => ({
-    date: new Date(Date.now() - (daysInRange - i) * 86400000).toISOString().slice(5),
-    projects: Math.floor(Math.random() * 8) + 2,
-  }));
-  
-  const p1Done = Math.floor(totalProjects * 0.8);
-  const p2Done = Math.floor(totalProjects * 0.6);
-  const p3Done = Math.floor(totalProjects * 0.4);
-  
-  const phaseRates = [
-    { phase: "Phase 1", rate: Math.round((p1Done / totalProjects) * 100) },
-    { phase: "Phase 2", rate: Math.round((p2Done / totalProjects) * 100) },
-    { phase: "Phase 3", rate: Math.round((p3Done / totalProjects) * 100) },
-  ];
-  
-  const executionModeChart = [
-    { name: "AI Development", value: 45, fill: COLORS[0] },
-    { name: "Lean Development", value: 32, fill: COLORS[1] },
-    { name: "Standard Build", value: 28, fill: COLORS[2] },
-    { name: "Full Team", value: 15, fill: COLORS[3] },
-  ];
-  
-  const toolUsageChart = [
-    { name: "icp-report", count: 234 },
-    { name: "prd-report", count: 189 },
-    { name: "growth-report", count: 156 },
-    { name: "roadmap-report", count: 134 },
-    { name: "experiment-report", count: 98 },
-    { name: "phase1-scoring", count: 87 },
-    { name: "phase2-scoring", count: 76 },
-    { name: "phase3-scoring", count: 65 },
-  ];
-  
-  const paywallViews = p3Done;
-  const projectUnlocks = unlocked;
-  const subscriptions = 42 * baseMultiplier;
-  const conversionRate = paywallViews > 0 ? Math.round((unlocked / paywallViews) * 100) : 0;
-  
-  const funnel = [
-    { stage: "Signed Up", value: totalUsers, fill: COLORS[0] },
-    { stage: "Workspace", value: Math.floor(totalUsers * 0.8), fill: COLORS[0] },
-    { stage: "Project", value: totalProjects, fill: COLORS[0] },
-    { stage: "Phase 1", value: p1Done, fill: COLORS[1] },
-    { stage: "Phase 2", value: p2Done, fill: COLORS[1] },
-    { stage: "Phase 3", value: p3Done, fill: COLORS[1] },
-    { stage: "Unlocked", value: unlocked, fill: COLORS[3] },
-  ];
-  
-  const dropoffs = [
-    { phase: "P1→P2", rate: p1Done > 0 ? Math.round(((p1Done - p2Done) / p1Done) * 100) : 25 },
-    { phase: "P2→P3", rate: p2Done > 0 ? Math.round(((p2Done - p3Done) / p2Done) * 100) : 33 },
-  ];
-  
-  return { 
-    dau, wau, mau, totalProjects, completed, abandoned, unlocked, locked, 
-    projectChart, phaseRates, executionModeChart, toolUsageChart, 
-    paywallViews, conversionRate, projectUnlocks, subscriptions, funnel, dropoffs 
-  };
-};
-
 export default function ProductAnalyticsPage() {
   const [range, setRange] = useState<TimeRange>("30d");
-  const [data, setData] = useState(generateDummyAnalytics(range));
+  const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setData(generateDummyAnalytics(range));
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
+    const fetchAnalytics = async () => {
+      setIsLoading(true);
+      try {
+        const response = await AdminApiService.getProductAnalytics(range);
+        if (response.success) {
+          setData(response.data);
+        } else {
+          toast.error("Failed to load product analytics");
+        }
+      } catch (error) {
+        toast.error("Error loading product analytics");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
   }, [range]);
 
   return (
@@ -204,6 +139,47 @@ export default function ProductAnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Phase Status Breakdown */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Phase Status Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground text-xs border-b">
+                  <th className="text-left py-2 pr-4">Phase</th>
+                  <th className="text-center py-2 px-3">Not Started</th>
+                  <th className="text-center py-2 px-3">In Progress</th>
+                  <th className="text-center py-2 px-3">Complete</th>
+                  <th className="text-center py-2 px-3">Locked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {['phase1', 'phase2', 'phase3'].map((phase, i) => (
+                  <tr key={phase} className="border-b last:border-0">
+                    <td className="py-2 pr-4 font-medium">Phase {i + 1}</td>
+                    <td className="text-center py-2 px-3 text-muted-foreground">
+                      {data?.phaseStatusBreakdown?.[phase]?.not_started ?? 0}
+                    </td>
+                    <td className="text-center py-2 px-3 text-blue-500 font-medium">
+                      {data?.phaseStatusBreakdown?.[phase]?.in_progress ?? 0}
+                    </td>
+                    <td className="text-center py-2 px-3 text-green-500 font-medium">
+                      {data?.phaseStatusBreakdown?.[phase]?.complete ?? 0}
+                    </td>
+                    <td className="text-center py-2 px-3 text-orange-500 font-medium">
+                      {data?.phaseStatusBreakdown?.[phase]?.locked ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tool Usage + Funnel */}
       <div className="grid md:grid-cols-2 gap-6">

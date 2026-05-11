@@ -13,51 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Search, Lock, Unlock, Archive, Pause, Trash2 } from "lucide-react";
-
-// Generate dummy data
-const generateDummyWorkspaces = () => [
-  {
-    id: "ws1",
-    name: "Tech Corp Workspace",
-    user_id: "user1",
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "active"
-  },
-  {
-    id: "ws2",
-    name: "Side Project",
-    user_id: "user1",
-    created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "active"
-  },
-  {
-    id: "ws3",
-    name: "Startup Inc Workspace",
-    user_id: "user2",
-    created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "archived"
-  },
-  {
-    id: "ws4",
-    name: "Design Co Workspace",
-    user_id: "user4",
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "active"
-  }
-];
-
-const generateDummyProfiles = () => [
-  { id: "user1", name: "John Doe", email: "john@example.com" },
-  { id: "user2", name: "Jane Smith", email: "jane@example.com" },
-  { id: "user4", name: "Alice Johnson", email: "alice@example.com" },
-];
-
-const generateDummyProjects = () => [
-  { id: "proj1", name: "AI Project Manager", workspace_id: "ws1", status: "active", overall_score: 85, phase1_status: "completed", phase2_status: "completed", phase3_status: "completed", project_locked: false, created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: "proj2", name: "E-commerce Platform", workspace_id: "ws2", status: "active", overall_score: 72, phase1_status: "completed", phase2_status: "in_progress", phase3_status: null, project_locked: true, created_at: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: "proj3", name: "Mobile App", workspace_id: "ws3", status: "paused", overall_score: 68, phase1_status: "completed", phase2_status: "completed", phase3_status: "locked", project_locked: true, created_at: new Date(Date.now() - 75 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: "proj4", name: "SaaS Tool", workspace_id: "ws4", status: "active", overall_score: null, phase1_status: "in_progress", phase2_status: null, phase3_status: null, project_locked: true, created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
-];
+import AdminApiService from "@/services/adminApi";
 
 export default function WorkspaceManagementPage() {
   const [search, setSearch] = useState("");
@@ -65,17 +21,92 @@ export default function WorkspaceManagementPage() {
   const [selectedWs, setSelectedWs] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: string; id: string; name: string; entity: "workspace" | "project" } | null>(null);
-  const [workspaces, setWorkspaces] = useState(generateDummyWorkspaces());
-  const [profiles, setProfiles] = useState(generateDummyProfiles());
-  const [projects, setProjects] = useState(generateDummyProjects());
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const PAGE_SIZE = 25;
 
+  const loadProjects = async () => {
+    try {
+      console.log('Loading all projects...');
+      const response = await AdminApiService.getAllProjects({
+        page: 0,
+        limit: 10000,
+        search: "",
+        sortBy: "createdAt",
+        sortOrder: "desc"
+      });
+      console.log('Projects API response:', response);
+      if (response && response.success) {
+        console.log('Setting projects from response.data.projects:', response.data.projects);
+        // Log the structure of each project to see the field names
+        response.data.projects.forEach((project: any, index: number) => {
+          console.log(`Project ${index} structure:`, project);
+        });
+        setProjects(response.data.projects);
+      } else {
+        console.error("Failed to load projects - response:", response);
+        setProjects([]); // Set empty array to prevent undefined issues
+      }
+    } catch (error) {
+      console.error("Error loading projects:", error);
+      setProjects([]); // Set empty array to prevent undefined issues
+    }
+  };
+
   useEffect(() => {
-    // Simulate initial loading
+    loadWorkspaces();
+    loadProjects();
+  }, [page, search]);
+
+  const loadWorkspaces = async () => {
     setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1000);
-  }, []);
+    try {
+      const response = await AdminApiService.getAllWorkspaces({
+        page,
+        search,
+        sortBy: "createdAt",
+        sortOrder: "desc"
+      });
+      if (response.success) {
+        console.log('Workspaces loaded:', response.data.workspaces);
+        // Log the structure of each workspace to see the field names
+        response.data.workspaces.forEach((workspace: any, index: number) => {
+          console.log(`Workspace ${index} structure:`, workspace);
+        });
+        setWorkspaces(response.data.workspaces);
+        // Load profiles for workspace owners
+        if (response.data.workspaces.length > 0) {
+          const userIds = response.data.workspaces.map((ws: any) => ws.user._id);
+          console.log('Extracted user IDs from workspaces:', userIds);
+          loadProfiles(userIds);
+        }
+      } else {
+        toast.error("Failed to load workspaces");
+      }
+    } catch (error) {
+      toast.error("Error loading workspaces");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadProfiles = async (userIds: string[]) => {
+    try {
+      console.log('Loading profiles for user IDs:', userIds);
+      const response = await AdminApiService.getUsersByIds(userIds);
+      console.log('Profiles API response:', response);
+      if (response.success) {
+        console.log('Setting profiles from response.data.users:', response.data.users);
+        setProfiles(response.data.users);
+      } else {
+        console.error("Failed to load profiles:", response.error);
+      }
+    } catch (error) {
+      console.error("Error loading profiles:", error);
+    }
+  };
 
   const updateProject = async ({ projectId, updates }: { projectId: string; updates: any }) => {
     setIsLoading(true);
@@ -89,35 +120,67 @@ export default function WorkspaceManagementPage() {
 
   const updateWorkspace = async ({ wsId, updates }: { wsId: string; updates: any }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setWorkspaces(prev => prev.map(ws => ws.id === wsId ? { ...ws, ...updates } : ws));
-      toast.success("Workspace updated");
-      setConfirmAction(null);
+    try {
+      if (updates.status) {
+        const response = await AdminApiService.updateWorkspaceStatus(wsId, updates.status);
+        if (response.success) {
+          setWorkspaces(prev => prev.map(ws => ws.id === wsId ? { ...ws, ...response.data } : ws));
+          toast.success("Workspace status updated");
+          setConfirmAction(null);
+        } else {
+          toast.error(response.error || "Failed to update workspace");
+        }
+      }
+    } catch (error) {
+      toast.error("Error updating workspace");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const deleteWorkspace = async (wsId: string) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setWorkspaces(prev => prev.filter(ws => ws.id !== wsId));
-      toast.success("Workspace deleted");
-      setConfirmAction(null);
+    try {
+      const response = await AdminApiService.deleteWorkspace(wsId);
+      if (response.success) {
+        setWorkspaces(prev => prev.filter(ws => ws.id !== wsId));
+        toast.success("Workspace deleted");
+        setConfirmAction(null);
+      } else {
+        toast.error(response.error || "Failed to delete workspace");
+      }
+    } catch (error) {
+      toast.error("Error deleting workspace");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const getOwner = (userId: string | null) => profiles?.find(p => p.id === userId);
-  const getProjectCount = (wsId: string) => projects?.filter(p => p.workspace_id === wsId).length || 0;
-  const getWsProjects = (wsId: string) => projects?.filter(p => p.workspace_id === wsId) || [];
+  const getOwner = (userId: string | null) => profiles?.find(p => p.id === userId) || profiles?.find(p => p._id === userId);
+  const getProjectCount = (wsId: string) => {
+    const count = projects?.filter(p => {
+      const pid = p.workspace?.id || p.workspace?._id || p.workspace_id;
+      return String(pid) === String(wsId);
+    }).length || 0;
+    return count;
+  };
+
+  const getWsProjects = (wsId: string) => {
+    return projects?.filter(p => {
+      const pid = p.workspace?.id || p.workspace?._id || p.workspace_id;
+      return String(pid) === String(wsId);
+    }) || [];
+  };
 
   const totalProjects = projects?.length ?? 0;
-  const lockedProjects = projects?.filter(p => p.project_locked !== false).length ?? 0;
+  const lockedProjects = projects?.filter(p => p.project_locked === true).length ?? 0;
   const unlockedProjects = projects?.filter(p => p.project_locked === false).length ?? 0;
+
+  console.log('Project totals - Total:', totalProjects, 'Locked:', lockedProjects, 'Unlocked:', unlockedProjects);
 
   const filtered = workspaces?.filter(w =>
     w.name?.toLowerCase().includes(search.toLowerCase()) ||
-    getOwner(w.user_id)?.email?.toLowerCase().includes(search.toLowerCase())
+    getOwner(w.user._id)?.email?.toLowerCase().includes(search.toLowerCase())
   ) || [];
 
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -173,7 +236,7 @@ export default function WorkspaceManagementPage() {
           </TableRow></TableHeader>
           <TableBody>
             {paginated.map(w => {
-              const owner = getOwner(w.user_id);
+              const owner = getOwner(w.user._id);
               const status = wsStatus(w);
               return (
                 <TableRow key={w.id}>
@@ -221,7 +284,7 @@ export default function WorkspaceManagementPage() {
           {selectedWs && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Owner:</span> {getOwner(selectedWs.user_id)?.name || "—"} ({getOwner(selectedWs.user_id)?.email || "—"})</div>
+                <div><span className="text-muted-foreground">Owner:</span> {getOwner(selectedWs.user._id)?.name || "—"} ({getOwner(selectedWs.user._id)?.email || "—"})</div>
                 <div><span className="text-muted-foreground">Created:</span> {new Date(selectedWs.created_at).toLocaleDateString()}</div>
                 <div><span className="text-muted-foreground">Status:</span> <Badge variant="outline">{wsStatus(selectedWs)}</Badge></div>
               </div>

@@ -7,95 +7,35 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend
 } from "recharts";
 import { Globe, Monitor, Smartphone, Eye, Clock, MousePointer, ArrowUpDown } from "lucide-react";
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 type TimeRange = "7d" | "30d" | "90d" | "all";
 const COLORS = ["hsl(182,72%,20%)", "hsl(23,80%,52%)", "hsl(182,30%,60%)", "hsl(0,72%,51%)", "hsl(182,50%,45%)"];
 
-// Generate dummy platform analytics data based on time range
-const generateDummyPlatformAnalytics = (range: TimeRange) => {
-  const baseMultiplier = range === "7d" ? 1 : range === "30d" ? 4 : range === "90d" ? 12 : 24;
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 365;
-  
-  const totalUsers = 245 * baseMultiplier;
-  const totalActivity = totalUsers + (156 * baseMultiplier) + (89 * baseMultiplier);
-  
-  const totalVisitors = Math.max(totalActivity * 3, totalUsers);
-  const uniqueVisitors = Math.max(totalActivity * 2, Math.floor(totalUsers * 0.8));
-  const totalPageViews = totalVisitors * 2.5;
-  const sessions = Math.floor(totalVisitors * 1.2);
-  const avgDuration = totalActivity > 10 ? "3m 12s" : "1m 48s";
-  const bounceRate = totalActivity > 10 ? "38%" : "52%";
-  const pagesPerSession = sessions > 0 ? (totalPageViews / sessions).toFixed(1) : "0";
-  
-  // Generate visitor trend data
-  const visitorTrend: { date: string; visitors: number; pageViews: number }[] = [];
-  for (let i = 0; i < days && i < 90; i++) {
-    const d = new Date(Date.now() - (days - 1 - i) * 86400000);
-    const dailyVisitors = Math.floor(Math.random() * 50) + 10;
-    visitorTrend.push({
-      date: d.toISOString().slice(5),
-      visitors: dailyVisitors,
-      pageViews: Math.floor(dailyVisitors * 2.5),
-    });
-  }
-  
-  const trafficSources = [
-    { name: "Direct", value: Math.floor(uniqueVisitors * 0.40), fill: COLORS[0] },
-    { name: "Search", value: Math.floor(uniqueVisitors * 0.25), fill: COLORS[1] },
-    { name: "Social", value: Math.floor(uniqueVisitors * 0.18), fill: COLORS[2] },
-    { name: "Referral", value: Math.floor(uniqueVisitors * 0.12), fill: COLORS[3] },
-    { name: "Campaign", value: Math.floor(uniqueVisitors * 0.05), fill: COLORS[4] },
-  ];
-  
-  const topPages = [
-    { page: "/", views: Math.floor(totalPageViews * 0.28), avgTime: "1m 45s", bounce: "38%" },
-    { page: "/pricing", views: Math.floor(totalPageViews * 0.16), avgTime: "2m 12s", bounce: "35%" },
-    { page: "/app", views: Math.floor(totalPageViews * 0.20), avgTime: "4m 30s", bounce: "15%" },
-    { page: "/blog", views: Math.floor(totalPageViews * 0.10), avgTime: "3m 05s", bounce: "44%" },
-    { page: "/login", views: Math.floor(totalPageViews * 0.12), avgTime: "0m 55s", bounce: "52%" },
-    { page: "/signup", views: Math.floor(totalPageViews * 0.08), avgTime: "1m 30s", bounce: "40%" },
-    { page: "/contact", views: Math.floor(totalPageViews * 0.06), avgTime: "2m 20s", bounce: "48%" },
-  ];
-  
-  const deviceBreakdown = [
-    { name: "Desktop", value: 62, fill: COLORS[0] },
-    { name: "Mobile", value: 30, fill: COLORS[1] },
-    { name: "Tablet", value: 8, fill: COLORS[2] },
-  ];
-  
-  const geography = [
-    { country: "United States", visitors: Math.floor(uniqueVisitors * 0.22) },
-    { country: "Nigeria", visitors: Math.floor(uniqueVisitors * 0.18) },
-    { country: "United Kingdom", visitors: Math.floor(uniqueVisitors * 0.12) },
-    { country: "India", visitors: Math.floor(uniqueVisitors * 0.09) },
-    { country: "Canada", visitors: Math.floor(uniqueVisitors * 0.07) },
-    { country: "Germany", visitors: Math.floor(uniqueVisitors * 0.05) },
-    { country: "South Africa", visitors: Math.floor(uniqueVisitors * 0.05) },
-    { country: "Australia", visitors: Math.floor(uniqueVisitors * 0.04) },
-  ];
-  
-  return {
-    totalVisitors: Math.round(totalVisitors),
-    uniqueVisitors: Math.round(uniqueVisitors),
-    totalPageViews: Math.round(totalPageViews),
-    sessions, avgDuration, bounceRate, pagesPerSession,
-    visitorTrend, trafficSources, topPages, deviceBreakdown, geography,
-  };
-};
-
 export default function PlatformAnalyticsPage() {
   const [range, setRange] = useState<TimeRange>("30d");
-  const [analytics, setAnalytics] = useState(generateDummyPlatformAnalytics(range));
+  const [analytics, setAnalytics] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setAnalytics(generateDummyPlatformAnalytics(range));
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
+    const fetchAnalytics = async () => {
+      setIsLoading(true);
+      try {
+        const response = await AdminApiService.getPlatformAnalytics(range);
+        if (response.success) {
+          setAnalytics(response.data);
+        } else {
+          toast.error("Failed to load platform analytics");
+        }
+      } catch (error) {
+        toast.error("Error loading platform analytics");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
   }, [range]);
 
   const traffic = analytics || {
@@ -121,10 +61,10 @@ export default function PlatformAnalyticsPage() {
       {/* Traffic KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
-          { label: "Total Visitors", value: traffic.totalVisitors.toLocaleString(), icon: Eye },
-          { label: "Unique Visitors", value: traffic.uniqueVisitors.toLocaleString(), icon: Globe },
-          { label: "Page Views", value: traffic.totalPageViews.toLocaleString(), icon: MousePointer },
-          { label: "Sessions", value: traffic.sessions.toLocaleString(), icon: ArrowUpDown },
+          { label: "Total Visitors", value: (traffic.totalVisitors || 0).toLocaleString(), icon: Eye },
+          { label: "Unique Visitors", value: (traffic.uniqueVisitors || 0).toLocaleString(), icon: Globe },
+          { label: "Page Views", value: (traffic.totalPageViews || 0).toLocaleString(), icon: MousePointer },
+          { label: "Sessions", value: (traffic.sessions || 0).toLocaleString(), icon: ArrowUpDown },
           { label: "Avg Duration", value: traffic.avgDuration, icon: Clock },
           { label: "Bounce Rate", value: traffic.bounceRate, icon: ArrowUpDown },
           { label: "Pages/Session", value: traffic.pagesPerSession, icon: Monitor },
@@ -162,8 +102,8 @@ export default function PlatformAnalyticsPage() {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={traffic.trafficSources} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2}>
-                    {traffic.trafficSources.map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
+                  <Pie data={traffic.trafficSources || []} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2}>
+                    {(traffic.trafficSources || []).map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
                   </Pie>
                   <Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} />
                 </PieChart>
@@ -183,10 +123,10 @@ export default function PlatformAnalyticsPage() {
                 <TableHead>Page</TableHead><TableHead>Views</TableHead><TableHead>Avg Time</TableHead><TableHead>Bounce</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {traffic.topPages.map((p: any) => (
-                  <TableRow key={p.page}>
+                {(traffic.topPages || []).map((p: any, index: number) => (
+                  <TableRow key={`page-${index}-${p.page}`}>
                     <TableCell className="font-mono text-sm">{p.page}</TableCell>
-                    <TableCell>{p.views.toLocaleString()}</TableCell>
+                    <TableCell>{(p.views || 0).toLocaleString()}</TableCell>
                     <TableCell>{p.avgTime}</TableCell>
                     <TableCell>{p.bounce}</TableCell>
                   </TableRow>
@@ -201,8 +141,8 @@ export default function PlatformAnalyticsPage() {
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={traffic.deviceBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2}>
-                    {traffic.deviceBreakdown.map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
+                  <Pie data={traffic.deviceBreakdown || []} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2}>
+                    {(traffic.deviceBreakdown || []).map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
                   </Pie>
                   <Tooltip formatter={(v: number) => `${v}%`} /><Legend wrapperStyle={{ fontSize: 10 }} />
                 </PieChart>
@@ -218,7 +158,7 @@ export default function PlatformAnalyticsPage() {
         <CardContent>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={traffic.geography} layout="vertical" margin={{ left: 100 }}>
+              <BarChart data={traffic.geography || []} layout="vertical" margin={{ left: 100 }}>
                 <XAxis type="number" tick={{ fontSize: 9 }} />
                 <YAxis type="category" dataKey="country" tick={{ fontSize: 10 }} width={100} />
                 <Tooltip /><Bar dataKey="visitors" fill={COLORS[0]} radius={[0, 4, 4, 0]} />

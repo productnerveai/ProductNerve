@@ -2,68 +2,31 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
 import { Badge } from "@/components/ui/badge";
-
-// Generate dummy growth analytics data
-const generateDummyGrowthAnalytics = () => {
-  const totalUsers = 987;
-  const newUsers30d = 89;
-  const activeSubs = 156;
-  const totalRevenue = 45678.90;
-  
-  const p3Complete = 234;
-  const unlocked = 89;
-  const paywallConversion = p3Complete > 0 ? Math.round((unlocked / p3Complete) * 100) : 0;
-  
-  // Generate revenue chart data for last 12 months
-  const revenueChart = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date(Date.now() - (11 - i) * 30 * 86400000);
-    return {
-      month: date.toISOString().slice(5, 7),
-      revenue: Math.floor(Math.random() * 5000) + 2000,
-    };
-  });
-  
-  // Generate acquisition chart data for last 12 months
-  const acquisitionChart = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date(Date.now() - (11 - i) * 30 * 86400000);
-    return {
-      month: date.toISOString().slice(5, 7),
-      users: Math.floor(Math.random() * 40) + 20,
-    };
-  });
-  
-  const couponData = [
-    { code: "WELCOME20", used: 45, active: true },
-    { code: "STARTUP10", used: 23, active: true },
-    { code: "EARLYBIRD", used: 67, active: false },
-    { code: "GROWTH2024", used: 12, active: true },
-  ];
-  
-  const conversionFunnel = [
-    { stage: "Total Users", value: totalUsers, fill: "hsl(182,72%,20%)" },
-    { stage: "Phase 3 Complete", value: p3Complete, fill: "hsl(182,50%,35%)" },
-    { stage: "Report Unlocked", value: unlocked, fill: "hsl(23,80%,52%)" },
-    { stage: "Subscribed", value: activeSubs, fill: "hsl(23,60%,38%)" },
-  ];
-  
-  return {
-    newUsers30d, totalUsers, activeSubs, paywallConversion,
-    totalRevenue, revenueChart, acquisitionChart, couponData, conversionFunnel,
-  };
-};
+import AdminApiService from "@/services/adminApi";
+import { toast } from "sonner";
 
 export default function GrowthAnalyticsPage() {
-  const [data, setData] = useState(generateDummyGrowthAnalytics());
+  const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setData(generateDummyGrowthAnalytics());
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
+    const fetchAnalytics = async () => {
+      setIsLoading(true);
+      try {
+        const response = await AdminApiService.getGrowthAnalytics();
+        if (response.success) {
+          setData(response.data);
+        } else {
+          toast.error("Failed to load growth analytics");
+        }
+      } catch (error) {
+        toast.error("Error loading growth analytics");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
   }, []);
 
   return (

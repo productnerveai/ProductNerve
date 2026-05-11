@@ -4,8 +4,12 @@ import { Navigate, Outlet } from "react-router-dom";
 export default function AdminProtectedRoute() {
   const { user, loading } = useAuth();
 
-  // Check admin status from user role
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  // Check admin status from user role - include all admin roles
+  const isAdmin = user?.role === 'admin' || 
+                 user?.role === 'product_analyst' || 
+                 user?.role === 'support_specialist' || 
+                 user?.role === 'growth_analyst' ||
+                 user?.admin_role; // Check both role and admin_role fields
 
   if (loading) {
     return (

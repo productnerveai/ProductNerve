@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, FileText, Newspaper, Upload, X, Image } from "lucide-react";
+import AdminApiService from "@/services/adminApi";
 
 function ImageUpload({ value, onChange }: { value: string | null; onChange: (url: string | null) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -150,15 +151,39 @@ export default function ContentManagementPage() {
   const [editPost, setEditPost] = useState<any>(null);
   const [showNewPost, setShowNewPost] = useState(false);
   const [postForm, setPostForm] = useState({ title: "", slug: "", excerpt: "", content: "", meta_title: "", meta_description: "", tags: "", cover_image_url: null as string | null });
-  const [pages, setPages] = useState(generateDummyPages());
-  const [posts, setPosts] = useState(generateDummyPosts());
+  const [pages, setPages] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Simulate initial loading
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1000);
+    loadContent();
   }, []);
+
+  const loadContent = async () => {
+    setIsLoading(true);
+    try {
+      const [pagesResponse, postsResponse] = await Promise.all([
+        AdminApiService.getAllPages(),
+        AdminApiService.getAllBlogPosts()
+      ]);
+
+      if (pagesResponse.success) {
+        setPages(pagesResponse.data.pages);
+      }
+
+      if (postsResponse.success) {
+        setPosts(postsResponse.data.blog_posts);
+      }
+
+      if (!pagesResponse.success || !postsResponse.success) {
+        toast.error("Failed to load content");
+      }
+    } catch (error) {
+      toast.error("Error loading content");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const updatePage = async ({ id, updates }: { id: string; updates: any }) => {
     setIsLoading(true);
@@ -172,61 +197,84 @@ export default function ContentManagementPage() {
 
   const createPost = async () => {
     setIsLoading(true);
-    const slug = postForm.slug || postForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    const newPost = {
-      id: `post_${Date.now()}`,
-      title: postForm.title,
-      slug,
-      excerpt: postForm.excerpt,
-      content: postForm.content,
-      meta_title: postForm.meta_title,
-      meta_description: postForm.meta_description,
-      tags: postForm.tags,
-      cover_image_url: postForm.cover_image_url,
-      is_published: false,
-      created_at: new Date().toISOString(),
-      published_at: null,
-    };
-    
-    setTimeout(() => {
-      setPosts(prev => [newPost, ...prev]);
-      toast.success("Post created");
-      setShowNewPost(false);
-      setPostForm({ title: "", slug: "", excerpt: "", content: "", meta_title: "", meta_description: "", tags: "", cover_image_url: null });
+    try {
+      const response = await AdminApiService.createBlogPost({
+        title: postForm.title,
+        slug: postForm.slug || undefined,
+        excerpt: postForm.excerpt,
+        content: postForm.content,
+        meta_title: postForm.meta_title,
+        meta_description: postForm.meta_description,
+        tags: postForm.tags ? postForm.tags.split(',').map(tag => tag.trim()) : [],
+        cover_image_url: postForm.cover_image_url,
+        is_published: false
+      });
+
+      if (response.success) {
+        setPosts(prev => [response.data, ...prev]);
+        toast.success("Post created");
+        setShowNewPost(false);
+        setPostForm({ title: "", slug: "", excerpt: "", content: "", meta_title: "", meta_description: "", tags: "", cover_image_url: null });
+      } else {
+        toast.error(response.error || "Failed to create post");
+      }
+    } catch (error) {
+      toast.error("Error creating post");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const updatePost = async ({ id, updates }: { id: string; updates: any }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setPosts(prev => prev.map(post => post.id === id ? { ...post, ...updates } : post));
-      toast.success("Post updated");
-      setEditPost(null);
+    try {
+      const response = await AdminApiService.updateBlogPost(id, updates);
+      if (response.success) {
+        setPosts(prev => prev.map(post => post.id === id ? { ...post, ...response.data } : post));
+        toast.success("Post updated");
+        setEditPost(null);
+      } else {
+        toast.error(response.error || "Failed to update post");
+      }
+    } catch (error) {
+      toast.error("Error updating post");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const deletePost = async (id: string) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setPosts(prev => prev.filter(post => post.id !== id));
-      toast.success("Post deleted");
+    try {
+      const response = await AdminApiService.deleteBlogPost(id);
+      if (response.success) {
+        setPosts(prev => prev.filter(post => post.id !== id));
+        toast.success("Post deleted");
+      } else {
+        toast.error(response.error || "Failed to delete post");
+      }
+    } catch (error) {
+      toast.error("Error deleting post");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const togglePublish = async ({ id, is_published }: { id: string; is_published: boolean }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setPosts(prev => prev.map(post => post.id === id ? { 
-        ...post, 
-        is_published, 
-        published_at: is_published ? new Date().toISOString() : null 
-      } : post));
-      toast.success("Publish status updated");
+    try {
+      const response = await AdminApiService.publishBlogPost(id);
+      if (response.success) {
+        setPosts(prev => prev.map(post => post.id === id ? { ...response.data } : post));
+        toast.success("Post published");
+      } else {
+        toast.error(response.error || "Failed to publish post");
+      }
+    } catch (error) {
+      toast.error("Error publishing post");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

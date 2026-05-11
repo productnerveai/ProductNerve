@@ -41,7 +41,7 @@ export default function AdminSidebar() {
   } = useAdminRole();
 
   const roleBadge: Record<string, string> = {
-    super_admin: "Super Admin",
+    super_admin: "admin",
     product_analyst: "Product Analyst",
     support_specialist: "Support Specialist",
     growth_analyst: "Growth Analyst",

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DollarSign, Users, CreditCard, Tag, Plus, Unlock } from "lucide-react";
+import AdminApiService from "@/services/adminApi";
 
 const PRO_MONTHLY_PRICE = 9.75;
 
@@ -41,16 +42,42 @@ export default function AdminBillingPage() {
   const [unlockDialog, setUnlockDialog] = useState(false);
   const [unlockEmail, setUnlockEmail] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
-  const [payments, setPayments] = useState(generateDummyPayments());
-  const [coupons, setCoupons] = useState(generateDummyCoupons());
-  const [profiles, setProfiles] = useState(generateDummyProfiles());
+  const [payments, setPayments] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [timeRange, setTimeRange] = useState("30d");
 
   useEffect(() => {
-    // Simulate initial loading
+    loadBillingData();
+  }, [timeRange]);
+
+  const loadBillingData = async () => {
     setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1000);
-  }, []);
+    try {
+      const [overviewResponse, transactionsResponse] = await Promise.all([
+        AdminApiService.getBillingOverview(timeRange),
+        AdminApiService.getBillingTransactions()
+      ]);
+
+      if (overviewResponse.success) {
+        // Overview data includes revenue, subscriptions, etc.
+        // We'll use this for the overview metrics
+      }
+
+      if (transactionsResponse.success) {
+        setPayments(transactionsResponse.data.transactions);
+      }
+
+      if (!overviewResponse.success || !transactionsResponse.success) {
+        toast.error("Failed to load billing data");
+      }
+    } catch (error) {
+      toast.error("Error loading billing data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const successPayments = payments?.filter((p) => p.status === "success") || [];
   const totalRevenue = successPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -95,24 +122,22 @@ export default function AdminBillingPage() {
       return;
     }
     
-    // Simulate granting subscription
-    setTimeout(() => {
-      setProfiles(prev => prev.map(p => p.email === email ? {
-        ...p,
-        plan_type: "pro",
-        subscription_plan: "pro",
-        subscription_status: "active",
-        subscription_start: new Date().toISOString(),
-        subscription_end: null,
-        subscription_granted_by: "admin",
-        subscription_granted_at: new Date().toISOString(),
-      } : p));
-      
-      toast.success('Subscription granted to ' + email);
-      setUnlockDialog(false);
-      setUnlockEmail("");
+    setIsLoading(true);
+    try {
+      const response = await AdminApiService.grantSubscriptionAccess(user.id, "pro", 30, "Admin granted Pro subscription");
+      if (response.success) {
+        setProfiles(prev => prev.map(p => p.id === user.id ? { ...p, ...response.data } : p));
+        toast.success('Subscription granted to ' + email);
+        setUnlockDialog(false);
+        setUnlockEmail("");
+      } else {
+        toast.error(response.error || "Failed to grant subscription");
+      }
+    } catch (error) {
+      toast.error("Error granting subscription");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const planLabel = (p: any) => {

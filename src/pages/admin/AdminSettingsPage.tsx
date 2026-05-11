@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { Settings, Shield, AlertTriangle, Tag, Plus } from "lucide-react";
 import { useState } from "react";
+import AdminApiService from "@/services/adminApi";
 
 export default function AdminSettingsPage() {
   const queryClient = useQueryClient();
@@ -16,22 +17,21 @@ export default function AdminSettingsPage() {
   const { data: settings } = useQuery({
     queryKey: ["admin-system-settings"],
     queryFn: async () => {
-      // TODO: Replace with actual API call
-      return {
-        maintenance_mode: { enabled: false },
-        feature_toggles: {
-          phase1_enabled: true, phase2_enabled: true, phase3_enabled: true,
-          pdf_export_enabled: true, kyc_required: false,
-        }
-      };
+      const response = await AdminApiService.getSystemSettings();
+      if (response.success) {
+        return response.data;
+      }
+      throw new Error("Failed to load settings");
     },
   });
 
   const upsertSetting = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: any; description?: string }) => {
-      // TODO: Replace with actual authentication and API call
-      const userId = "admin-user";
-      console.log("Would upsert setting:", { key, value, description, userId });
+      const response = await AdminApiService.updateSystemSetting(key, value, description);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update setting");
+      }
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-system-settings"] });

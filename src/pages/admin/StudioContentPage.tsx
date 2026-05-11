@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { Search, Eye, Trash2, Archive, Flag } from "lucide-react";
 import { format } from "date-fns";
+import AdminApiService from "@/services/adminApi";
 
 type ToolTab = "prd_documents" | "user_stories" | "icp_profiles" | "experiments" | "growth_plans" | "roadmaps";
 
@@ -79,14 +80,24 @@ export default function StudioContentPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setItems(generateDummyContent(activeTab));
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
+    loadStudioContent();
   }, [activeTab]);
+
+  const loadStudioContent = async () => {
+    setIsLoading(true);
+    try {
+      const response = await AdminApiService.getStudioContent();
+      if (response.success) {
+        setItems(response.data[activeTab] || []);
+      } else {
+        toast.error("Failed to load studio content");
+      }
+    } catch (error) {
+      toast.error("Error loading studio content");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const deleteItem = async (id: string) => {
     setIsLoading(true);

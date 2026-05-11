@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Send, MessageSquare, Bug, Lightbulb } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -181,7 +182,7 @@ export default function SupportInboxPage() {
                           </div>
                         )}
                         <p className="text-[10px] text-muted-foreground/60 mt-1">
-                          {new Date(ticket.created_at).toLocaleDateString()} • {ticket.feedback_type}
+                          {format(ticket.createdAt, 'MMM d, yyyy')} • {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })} • {ticket.feedback_type}
                         </p>
                       </div>
                     </div>
