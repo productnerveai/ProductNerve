@@ -6,6 +6,7 @@
  */
 
 const STORAGE_KEY = "pn_cookie_consent";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export interface ConsentState {
   analytics: boolean;
@@ -32,19 +33,22 @@ export function setConsent(analytics: boolean) {
   listeners.forEach((l) => l(state));
 
   // Persist to profile if logged in
-  supabase.auth.getUser().then(({ data }) => {
-    const uid = data?.user?.id;
-    if (uid) {
-      supabase
-        .from("profiles")
-        .update({
-          cookie_consent: analytics,
-          cookie_consent_at: state.timestamp,
-        } as any)
-        .eq("id", uid)
-        .then(() => {});
-    }
-  });
+  const token = localStorage.getItem('token');
+  if (token) {
+    fetch(`${API_BASE_URL}/auth/cookie-consent`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        cookie_consent: analytics,
+        cookie_consent_at: state.timestamp
+      })
+    }).catch(err => {
+      console.error('Failed to persist cookie consent:', err);
+    });
+  }
 
   if (analytics) {
     loadAnalyticsScripts();
